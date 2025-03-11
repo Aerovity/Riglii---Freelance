@@ -2,28 +2,41 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { Search, Bell, Mail, Heart, ChevronDown, ArrowRight, Star } from "lucide-react"
+import { Search, Heart, ChevronDown, ArrowRight, Star, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import LanguageSwitcher from "@/components/language-switcher"
+import LanguageSelector from "@/components/language-selector"
 import { useLanguage } from "./language-provider"
+import NotificationsDropdown from "@/components/notifications-dropdown"
+import MessagesDropdown from "@/components/messages-dropdown"
+import CategoriesDropdown from "@/components/categories-dropdown"
 
+// Update the existing Home component
 export default function Home() {
   const { t, language } = useLanguage()
-
   const isRtl = language === "ar"
+
+  // Function to format price in DZD
+  const formatPrice = (amount: number) => {
+    return new Intl.NumberFormat("fr-DZ", {
+      style: "currency",
+      currency: "DZD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount)
+  }
 
   return (
     <div className={`min-h-screen bg-white ${isRtl ? "rtl" : "ltr"}`}>
       {/* Header */}
       <header className="sticky top-0 z-50 bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 flex items-center justify-between h-16">
-          <div className="flex items-center gap-6">
-            <Link href="/" className="text-[#0F2830] font-bold text-2xl flex items-center">
+          <div className="flex items-center gap-6 flex-1">
+            <Link href="/" className="text-[#0F2830] font-bold text-2xl flex items-center shrink-0">
               Riglii
-              <ArrowRight className="h-4 w-4 text-[#00D37F] ml-1" />
+              <ArrowRight className="h-4 w-4 text-[#00D37F] -ml-0.5 transform rotate-45" />
             </Link>
-            <div className="relative hidden md:flex items-center flex-1 max-w-md">
+            <div className="relative flex items-center flex-1 max-w-xl">
               <Input
                 type="text"
                 placeholder={t("search")}
@@ -46,23 +59,16 @@ export default function Home() {
             <Link href="/business" className="text-[#0F2830] hover:text-[#00D37F] text-sm font-medium">
               {t("business")}
             </Link>
-            <Link href="/upgrade" className="text-[#0F2830] hover:text-[#00D37F] text-sm font-medium">
-              {t("upgrade")}
-            </Link>
-            <LanguageSwitcher />
+            <LanguageSelector />
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                <Bell className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                <Mail className="h-5 w-5" />
-              </Button>
+              <NotificationsDropdown />
+              <MessagesDropdown />
               <Button variant="ghost" size="icon" className="text-[#0F2830]">
                 <Heart className="h-5 w-5" />
               </Button>
               <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                <div className="w-8 h-8 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751] font-medium">
-                  Z
+                <div className="w-8 h-8 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751]">
+                  <User className="h-5 w-5" />
                 </div>
               </Button>
             </div>
@@ -92,32 +98,7 @@ export default function Home() {
       {/* Categories Navigation */}
       <div className="border-b border-gray-200 overflow-x-auto">
         <div className="container mx-auto px-4">
-          <div className="flex space-x-6 py-3 text-sm whitespace-nowrap">
-            <Link href="/graphics-design" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Graphics & Design
-            </Link>
-            <Link href="/programming" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Programming & Tech
-            </Link>
-            <Link href="/digital-marketing" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Digital Marketing
-            </Link>
-            <Link href="/video-animation" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Video & Animation
-            </Link>
-            <Link href="/writing" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Writing & Translation
-            </Link>
-            <Link href="/music" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Music & Audio
-            </Link>
-            <Link href="/business" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              Business
-            </Link>
-            <Link href="/ai-services" className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              AI Services
-            </Link>
-          </div>
+          <CategoriesDropdown />
         </div>
       </div>
 
@@ -295,7 +276,7 @@ export default function Home() {
 
                   <div className="flex justify-between items-center pt-3 border-t border-gray-100">
                     <p className="text-xs text-gray-500">{t("from")}</p>
-                    <p className="font-bold text-[#0F2830]">${50 + item * 25}</p>
+                    <p className="font-bold text-[#0F2830]">{formatPrice(1750 + item * 50)}</p>
                   </div>
                 </div>
               </div>
@@ -466,7 +447,7 @@ export default function Home() {
             <div className="flex items-center gap-2 mb-4 md:mb-0">
               <Link href="/" className="text-white font-bold text-xl flex items-center">
                 Riglii
-                <ArrowRight className="h-4 w-4 text-[#00D37F] ml-1" />
+                <ArrowRight className="h-4 w-4 text-[#00D37F] -ml-0.5 transform rotate-45" />
               </Link>
               <p className="text-sm text-gray-400">© 2025 Riglii Inc.</p>
             </div>

@@ -79,5 +79,14 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  .rtl {
+    direction: rtl;
+    text-align: right;
+  }
+
+  .font-arabic {
+    font-family: "Amiri", serif;
+  }
 }
 
