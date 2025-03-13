@@ -11,6 +11,8 @@ import NotificationsDropdown from "@/components/notifications-dropdown"
 import MessagesDropdown from "@/components/messages-dropdown"
 import CategoriesDropdown from "@/components/categories-dropdown"
 
+
+
 // Update the existing Home component
 export default function Home() {
   const { t, language } = useLanguage()
@@ -96,7 +98,7 @@ export default function Home() {
       </header>
 
       {/* Categories Navigation */}
-      <div className="border-b border-gray-200 overflow-x-auto">
+      <div className="border-b border-gray-200">
         <div className="container mx-auto px-4">
           <CategoriesDropdown />
         </div>
