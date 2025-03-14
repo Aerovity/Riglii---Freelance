@@ -10,11 +10,17 @@ import { useLanguage } from "./language-provider"
 import NotificationsDropdown from "@/components/notifications-dropdown"
 import MessagesDropdown from "@/components/messages-dropdown"
 import CategoriesDropdown from "@/components/categories-dropdown"
-
-
+import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 // Update the existing Home component
 export default function Home() {
+  const { isSignedIn } = useUser()
   const { t, language } = useLanguage()
   const isRtl = language === "ar"
 
@@ -68,11 +74,38 @@ export default function Home() {
               <Button variant="ghost" size="icon" className="text-[#0F2830]">
                 <Heart className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                <div className="w-8 h-8 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751]">
-                  <User className="h-5 w-5" />
-                </div>
-              </Button>
+              
+              {/* Authentication - Profile or Get Started button */}
+              {isSignedIn ? (
+                <UserButton 
+                  afterSignOutUrl="/"
+                  appearance={{
+                    elements: {
+                      userButtonAvatarBox: "w-8 h-8"
+                    }
+                  }}
+                />
+              ) : (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button className="bg-[#00D37F] hover:bg-[#00c070] text-white rounded-full px-4 py-2">
+                      {t("getStarted")}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem className="cursor-pointer">
+                      <SignInButton mode="modal">
+                        <div className="w-full">{t("login")}</div>
+                      </SignInButton>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="cursor-pointer">
+                      <SignUpButton mode="modal">
+                        <div className="w-full">{t("register")}</div>
+                      </SignUpButton>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
             </div>
           </nav>
 
@@ -530,4 +563,3 @@ export default function Home() {
     </div>
   )
 }
-
