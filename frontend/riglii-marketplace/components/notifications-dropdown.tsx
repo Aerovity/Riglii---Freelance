@@ -1,7 +1,12 @@
 "use client"
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Bell } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Bell } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 
 export default function NotificationsDropdown() {
@@ -63,4 +68,3 @@ export default function NotificationsDropdown() {
     </DropdownMenu>
   )
 }
-

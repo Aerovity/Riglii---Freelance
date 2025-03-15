@@ -1,12 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu"
 import Link from "next/link"
-import { CustomNavTrigger } from "./CustomNavTrigger"
 
 export default function CategoriesDropdown() {
-  const [activeCategory, setActiveCategory] = useState<string | null>(null)
-
   const categories = {
     "Logo & Brand Identity": [
       "Logo Design",
@@ -89,35 +92,33 @@ export default function CategoriesDropdown() {
   }
 
   return (
-    <div className="flex space-x-4 border-b border-gray-100 py-1 px-2 text-sm">
-  {Object.entries(categories).map(([category, subcategories]) => (
-    <div key={category} className="relative">
-      <CustomNavTrigger
-        onClick={() =>
-          setActiveCategory(activeCategory === category ? null : category)
-        }
-      >
-        {category}
-      </CustomNavTrigger>
-
-      {activeCategory === category && (
-        <div className="absolute left-0 top-full mt-2 z-50 w-[300px] bg-white text-[#0F2830] shadow-md rounded-md p-2">
-          <div className="grid grid-cols-2 gap-4">
-            {subcategories.map((subcategory) => (
-              <Link
-                key={subcategory}
-                href={`/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
-                className="block rounded-md p-2 no-underline transition-colors hover:bg-[#AFF8C8]/10 hover:text-[#00D37F]"
-                onClick={() => setActiveCategory(null)}
-              >
-                {subcategory}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
+    <div className="flex justify-center">
+      {Object.entries(categories).map(([category, subcategories]) => (
+        <NavigationMenu key={category} className="mx-1">
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-[#0F2830] hover:text-[#00D37F] font-medium">
+                {category}
+              </NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="grid gap-3 p-6 w-[400px]">
+                  <div className="grid grid-cols-2 gap-4">
+                    {subcategories.map((subcategory) => (
+                      <Link
+                        key={subcategory}
+                        href={`/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
+                        className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#AFF8C8]/10 hover:text-[#00D37F]"
+                      >
+                        {subcategory}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        </NavigationMenu>
+      ))}
     </div>
-  ))}
-</div>
   )
 }
