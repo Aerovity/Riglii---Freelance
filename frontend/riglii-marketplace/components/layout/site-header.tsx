@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, Heart, ArrowRight } from 'lucide-react'
+import { Search, Heart, ArrowRight, BriefcaseBusiness } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import LanguageSelector from "@/components/language-selector"
@@ -15,12 +15,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
+import FreelancerOnboarding from "@/components/freelancer-onboarding"
 
 export default function SiteHeader() {
-  const { isSignedIn } = useUser()
+  const { isSignedIn, user } = useUser()
   const { t, language } = useLanguage()
   const isRtl = language === "ar"
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   return (
     <>
@@ -57,11 +62,23 @@ export default function SiteHeader() {
             </Link>
             <LanguageSelector />
             <div className="flex items-center gap-2">
-              <NotificationsDropdown />
-              <MessagesDropdown />
-              <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                <Heart className="h-5 w-5" />
-              </Button>
+              {isSignedIn && (
+                <>
+                  <NotificationsDropdown />
+                  <MessagesDropdown />
+                  <Button variant="ghost" size="icon" className="text-[#0F2830]">
+                    <Heart className="h-5 w-5" />
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="text-[#0F2830] hover:text-[#00D37F] flex items-center gap-1"
+                    onClick={() => setShowOnboarding(true)}
+                  >
+                    <BriefcaseBusiness className="h-4 w-4" />
+                    <span>{t("becomeFreelancer") || "Become a Freelancer"}</span>
+                  </Button>
+                </>
+              )}
               
               {/* Authentication - Profile or Get Started button */}
               {isSignedIn ? (
@@ -119,11 +136,18 @@ export default function SiteHeader() {
       </header>
 
       {/* Categories Navigation */}
-      <div className="border-b border-gray-200 ">
+      <div className="border-b border-gray-200">
         <div className="container mx-auto px-4">
           <CategoriesDropdown />
         </div>
       </div>
+
+      {/* Freelancer Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="max-w-4xl p-0 overflow-hidden">
+          <FreelancerOnboarding onClose={() => setShowOnboarding(false)} />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
