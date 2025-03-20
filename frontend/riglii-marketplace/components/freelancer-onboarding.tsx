@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Check, Upload, X } from 'lucide-react'
+import { Check, Upload, X, Plus, Trash2 } from 'lucide-react'
 import { DialogTitle } from "@/components/ui/dialog"
 import { useUser } from "@clerk/nextjs"
 
@@ -21,9 +21,10 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     lastName: user?.lastName || "",
     displayName: user?.username || "",
     description: "",
-    languages: [{ language: "English", level: "Basic" }],
+    languages: [] as { language: string; level: string }[],
     categories: [] as string[],
     occupation: "",
+    customOccupation: "",
     skills: [] as { skill: string; level: string }[],
     education: {
       country: "",
@@ -32,12 +33,19 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
       major: "",
       year: "",
     },
+    certificates: [] as { name: string; issuer: string; year: string }[],
     idCard: null as File | null,
     ccpDetails: {
       rib: "",
       name: "",
     },
   })
+
+  // New state for form inputs
+  const [newLanguage, setNewLanguage] = useState({ language: "", level: "Basic" })
+  const [newSkill, setNewSkill] = useState({ skill: "", level: "Beginner" })
+  const [newCertificate, setNewCertificate] = useState({ name: "", issuer: "", year: "" })
+  const [showCustomOccupation, setShowCustomOccupation] = useState(false)
 
   const categories = [
     "Logo & Brand Identity",
@@ -52,6 +60,43 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     "Business",
     "Data",
     "Photography",
+  ]
+
+  const occupations = [
+    "Web Developer",
+    "Graphic Designer",
+    "Content Writer",
+    "Digital Marketer",
+    "Video Editor",
+    "Translator",
+    "UI/UX Designer",
+    "Mobile App Developer",
+    "Data Scientist",
+    "SEO Specialist",
+    "Social Media Manager",
+    "Photographer",
+    "Illustrator",
+    "Voice Over Artist",
+    "Music Producer",
+    "Business Consultant",
+    "Virtual Assistant",
+    "Accountant",
+    "Legal Consultant",
+    "Other"
+  ]
+
+  const proficiencyLevels = [
+    "Basic",
+    "Intermediate",
+    "Fluent",
+    "Bilingual/Native"
+  ]
+
+  const skillLevels = [
+    "Beginner",
+    "Intermediate",
+    "Advanced",
+    "Expert"
   ]
 
   const handleCategoryToggle = (category: string) => {
@@ -94,6 +139,74 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
         [field]: e.target.value,
       },
     })
+  }
+
+  const addLanguage = () => {
+    if (newLanguage.language.trim() !== "") {
+      setFormData({
+        ...formData,
+        languages: [...formData.languages, { ...newLanguage }]
+      })
+      setNewLanguage({ language: "", level: "Basic" })
+    }
+  }
+
+  const removeLanguage = (index: number) => {
+    setFormData({
+      ...formData,
+      languages: formData.languages.filter((_, i) => i !== index)
+    })
+  }
+
+  const addSkill = () => {
+    if (newSkill.skill.trim() !== "") {
+      setFormData({
+        ...formData,
+        skills: [...formData.skills, { ...newSkill }]
+      })
+      setNewSkill({ skill: "", level: "Beginner" })
+    }
+  }
+
+  const removeSkill = (index: number) => {
+    setFormData({
+      ...formData,
+      skills: formData.skills.filter((_, i) => i !== index)
+    })
+  }
+
+  const addCertificate = () => {
+    if (newCertificate.name.trim() !== "" && newCertificate.issuer.trim() !== "") {
+      setFormData({
+        ...formData,
+        certificates: [...formData.certificates, { ...newCertificate }]
+      })
+      setNewCertificate({ name: "", issuer: "", year: "" })
+    }
+  }
+
+  const removeCertificate = (index: number) => {
+    setFormData({
+      ...formData,
+      certificates: formData.certificates.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleOccupationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value
+    if (value === "Other") {
+      setShowCustomOccupation(true)
+      setFormData({
+        ...formData,
+        occupation: "Other"
+      })
+    } else {
+      setShowCustomOccupation(false)
+      setFormData({
+        ...formData,
+        occupation: value
+      })
+    }
   }
 
   const renderStep = () => {
@@ -165,17 +278,65 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                   Languages <span className="text-red-500">*</span>
                 </Label>
                 <div className="border rounded-md p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="font-medium">Language</div>
-                    <div className="font-medium">Level</div>
+                  {formData.languages.length > 0 && (
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="font-medium">Language</div>
+                        <div className="font-medium">Level</div>
+                        <div></div>
+                      </div>
+                      {formData.languages.map((lang, index) => (
+                        <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
+                          <div>{lang.language}</div>
+                          <div>{lang.level}</div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => removeLanguage(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1">
+                      <Label htmlFor="language" className="block mb-2 text-sm">
+                        Language
+                      </Label>
+                      <Input
+                        id="language"
+                        value={newLanguage.language}
+                        onChange={(e) => setNewLanguage({ ...newLanguage, language: e.target.value })}
+                        placeholder="e.g. English, French, Arabic"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Label htmlFor="languageLevel" className="block mb-2 text-sm">
+                        Proficiency
+                      </Label>
+                      <select
+                        id="languageLevel"
+                        className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
+                        value={newLanguage.level}
+                        onChange={(e) => setNewLanguage({ ...newLanguage, level: e.target.value })}
+                      >
+                        {proficiencyLevels.map((level) => (
+                          <option key={level} value={level}>{level}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <Button 
+                      onClick={addLanguage} 
+                      disabled={!newLanguage.language.trim()}
+                      className="bg-[#00D37F] hover:bg-[#00c070] text-white"
+                    >
+                      <Plus className="h-4 w-4 mr-1" /> Add
+                    </Button>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <div>English</div>
-                    <div>Basic</div>
-                  </div>
-                  <Button variant="outline" className="w-full mt-4 text-[#00D37F]">
-                    + Add New
-                  </Button>
                 </div>
               </div>
             </div>
@@ -225,45 +386,138 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                     id="occupation"
                     className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
                     value={formData.occupation}
-                    onChange={(e) => setFormData({ ...formData, occupation: e.target.value })}
+                    onChange={handleOccupationChange}
                   >
                     <option value="" disabled>Select Occupation</option>
-                    <option value="Web Developer">Web Developer</option>
-                    <option value="Graphic Designer">Graphic Designer</option>
-                    <option value="Content Writer">Content Writer</option>
-                    <option value="Digital Marketer">Digital Marketer</option>
-                    <option value="Video Editor">Video Editor</option>
-                    <option value="Translator">Translator</option>
+                    {occupations.map((occupation) => (
+                      <option key={occupation} value={occupation}>{occupation}</option>
+                    ))}
                   </select>
                 </div>
-                <Button variant="link" className="text-[#00D37F] p-0 h-auto mt-2">
-                  + Add New
-                </Button>
+                
+                {showCustomOccupation && (
+                  <div className="mt-3">
+                    <Label htmlFor="customOccupation" className="block mb-2 text-sm">
+                      Specify Your Occupation
+                    </Label>
+                    <Input
+                      id="customOccupation"
+                      value={formData.customOccupation}
+                      onChange={(e) => handleInputChange(e, "customOccupation")}
+                      placeholder="Enter your occupation"
+                    />
+                  </div>
+                )}
               </div>
 
               <div>
                 <Label className="block mb-2">
                   Skills <span className="text-red-500">*</span>
                 </Label>
+                
+                {formData.skills.length > 0 && (
+                  <div className="mb-4 border rounded-md p-3">
+                    {formData.skills.map((skill, index) => (
+                      <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
+                        <div className="font-medium">{skill.skill}</div>
+                        <div className="flex items-center">
+                          <span className="text-sm text-gray-600 mr-3">{skill.level}</span>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => removeSkill(index)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <select
-                      className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
-                    >
-                      <option value="">Add Skill (e.g. Voice Talent)</option>
-                    </select>
+                    <Input
+                      placeholder="Add Skill (e.g. JavaScript, Photoshop)"
+                      value={newSkill.skill}
+                      onChange={(e) => setNewSkill({ ...newSkill, skill: e.target.value })}
+                    />
                   </div>
                   <div className="flex-1">
                     <select
                       className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
+                      value={newSkill.level}
+                      onChange={(e) => setNewSkill({ ...newSkill, level: e.target.value })}
                     >
-                      <option value="">Experience Level</option>
+                      {skillLevels.map((level) => (
+                        <option key={level} value={level}>{level}</option>
+                      ))}
                     </select>
                   </div>
-                  <Button variant="secondary" className="flex-shrink-0">
+                  <Button 
+                    onClick={addSkill} 
+                    disabled={!newSkill.skill.trim()}
+                    className="bg-[#00D37F] hover:bg-[#00c070] text-white"
+                  >
                     Add
                   </Button>
                 </div>
+              </div>
+
+              <div>
+                <Label className="block mb-2">
+                  Certifications
+                </Label>
+                
+                {formData.certificates.length > 0 && (
+                  <div className="mb-4 border rounded-md p-3">
+                    {formData.certificates.map((cert, index) => (
+                      <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
+                        <div>
+                          <div className="font-medium">{cert.name}</div>
+                          <div className="text-sm text-gray-600">
+                            {cert.issuer} {cert.year && `• ${cert.year}`}
+                          </div>
+                        </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => removeCertificate(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-3 gap-2 mb-2">
+                  <Input
+                    placeholder="Certificate Name"
+                    value={newCertificate.name}
+                    onChange={(e) => setNewCertificate({ ...newCertificate, name: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Issuing Organization"
+                    value={newCertificate.issuer}
+                    onChange={(e) => setNewCertificate({ ...newCertificate, issuer: e.target.value })}
+                  />
+                  <Input
+                    placeholder="Year (optional)"
+                    value={newCertificate.year}
+                    onChange={(e) => setNewCertificate({ ...newCertificate, year: e.target.value })}
+                  />
+                </div>
+                <Button 
+                  variant="outline"
+                  onClick={addCertificate} 
+                  disabled={!newCertificate.name.trim() || !newCertificate.issuer.trim()}
+                  className="w-full text-[#00D37F] border-[#00D37F]"
+                >
+                  <Plus className="h-4 w-4 mr-1" /> Add Certificate
+                </Button>
               </div>
             </div>
           </div>
@@ -299,8 +553,9 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                         variant="ghost"
                         size="sm"
                         onClick={() => setFormData({ ...formData, idCard: null })}
+                        className="text-gray-500 hover:text-gray-700"
                       >
-                        <X className="h-4 w-4" />
+                        <X className="h-5 w-5" />
                       </Button>
                     </div>
                   ) : (
@@ -416,8 +671,13 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               3
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700"
+          >
+            <X className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -443,6 +703,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               handleSubmit()
             }
           }}
+          className="bg-[#00D37F] hover:bg-[#00c070] text-white"
         >
           {step < 3 ? "Continue" : "Submit"}
         </Button>
