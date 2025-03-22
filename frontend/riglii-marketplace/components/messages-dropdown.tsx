@@ -1,7 +1,12 @@
 "use client"
 
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Mail } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Mail } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 
 export default function MessagesDropdown() {
@@ -74,4 +79,3 @@ export default function MessagesDropdown() {
     </DropdownMenu>
   )
 }
-

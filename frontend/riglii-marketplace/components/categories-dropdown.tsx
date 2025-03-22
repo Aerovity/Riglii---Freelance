@@ -92,32 +92,33 @@ export default function CategoriesDropdown() {
   }
 
   return (
-    <NavigationMenu>
-      <NavigationMenuList>
-        {Object.entries(categories).map(([category, subcategories]) => (
-          <NavigationMenuItem key={category}>
-            <NavigationMenuTrigger className="text-[#0F2830] hover:text-[#00D37F] font-medium">
-              {category}
-            </NavigationMenuTrigger>
-            <NavigationMenuContent>
-              <div className="grid gap-3 p-6 w-[400px]">
-                <div className="grid grid-cols-2 gap-4">
-                  {subcategories.map((subcategory) => (
-                    <Link
-                      key={subcategory}
-                      href={`/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
-                      className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#AFF8C8]/10 hover:text-[#00D37F]"
-                    >
-                      {subcategory}
-                    </Link>
-                  ))}
+    <div className="flex justify-center">
+      {Object.entries(categories).map(([category, subcategories]) => (
+        <NavigationMenu key={category} className="mx-1">
+          <NavigationMenuList>
+            <NavigationMenuItem>
+              <NavigationMenuTrigger className="text-[#0F2830] hover:text-[#00D37F] font-medium">
+                {category}
+              </NavigationMenuTrigger>
+              <NavigationMenuContent>
+                <div className="grid gap-3 p-6 w-[400px]">
+                  <div className="grid grid-cols-2 gap-4">
+                    {subcategories.map((subcategory) => (
+                      <Link
+                        key={subcategory}
+                        href={`/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
+                        className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#AFF8C8]/10 hover:text-[#00D37F]"
+                      >
+                        {subcategory}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </NavigationMenuContent>
-          </NavigationMenuItem>
-        ))}
-      </NavigationMenuList>
-    </NavigationMenu>
+              </NavigationMenuContent>
+            </NavigationMenuItem>
+          </NavigationMenuList>
+        </NavigationMenu>
+      ))}
+    </div>
   )
 }
-

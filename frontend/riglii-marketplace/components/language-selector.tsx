@@ -2,8 +2,14 @@
 
 import { useLanguage } from "@/app/language-provider"
 import { Button } from "@/components/ui/button"
-import { ChevronDown } from "lucide-react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ChevronDown } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 
 export default function LanguageSelector() {
   const { language, setLanguage } = useLanguage()
@@ -51,4 +57,3 @@ export default function LanguageSelector() {
     </Dialog>
   )
 }
-
