@@ -6,26 +6,43 @@ const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-if(supabase) {
-    console.log("Supabase client created successfully!");
-  }
-  
+if (supabase) {
+  console.log("Supabase client created successfully!");
+}
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ message: 'Method not allowed. Use POST.' });
+  }
+
   try {
-    const { data, error } = await supabase.from('user').select('*').limit(1);
+    const { data, error } = await supabase
+      .from('users')
+      .insert([
+        {
+          clerk_id: 'test_clerk_id',
+          email: 'testuser@example.com',
+          is_freelancer: false,
+        },
+      ])
+      .select();
 
     if (error) {
       throw error;
     }
 
-    res.status(200).json({ message: '✅ Connection successful!', data });
+    res.status(200).json({
+      message: '✅ Test user inserted successfully!',
+      data,
+    });
   } catch (error: any) {
     res.status(500).json({
-      message: '❌ Connection failed!',
+      message: '❌ Failed to insert test user!',
       error: error.message || error,
     });
   }
 }
+
