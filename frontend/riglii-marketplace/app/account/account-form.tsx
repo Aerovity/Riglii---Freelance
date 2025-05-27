@@ -1,14 +1,19 @@
-'use client'
-import { useCallback, useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
-import { type User } from '@supabase/supabase-js'
-import Avatar from './avatar'
-
-// ...
+"use client"
+import { useCallback, useEffect, useState } from "react"
+import { createClient } from "@/utils/supabase/client"
+import type { User } from "@supabase/supabase-js"
+import Avatar from "./avatar"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Separator } from "@/components/ui/separator"
+import { useToast } from "@/hooks/use-toast"
 
 export default function AccountForm({ user }: { user: User | null }) {
   const supabase = createClient()
-  const [loading, setLoading] = useState(true)
+  const { toast } = useToast()
+  const [loading, setLoading] = useState(false)
   const [fullname, setFullname] = useState<string | null>(null)
   const [username, setUsername] = useState<string | null>(null)
   const [website, setWebsite] = useState<string | null>(null)
@@ -18,29 +23,24 @@ export default function AccountForm({ user }: { user: User | null }) {
     try {
       setLoading(true)
 
-      const { data, error, status } = await supabase
-        .from('profiles')
-        .select(`full_name, username, website, avatar_url`)
-        .eq('id', user?.id)
-        .single()
-
-      if (error && status !== 406) {
-        console.log(error)
-        throw error
-      }
-
-      if (data) {
-        setFullname(data.full_name)
-        setUsername(data.username)
-        setWebsite(data.website)
-        setAvatarUrl(data.avatar_url)
+      if (user) {
+        // Get data from user metadata and user object
+        const metadata = user.user_metadata || {}
+        setFullname(metadata.full_name || metadata.name || user.email?.split("@")[0] || null)
+        setUsername(metadata.username || null)
+        setWebsite(metadata.website || null)
+        setAvatarUrl(metadata.avatar_url || null)
       }
     } catch (error) {
-      alert('Error loading user data!')
+      toast({
+        title: "Error",
+        description: "Error loading user data!",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
-  }, [user, supabase])
+  }, [user, toast])
 
   useEffect(() => {
     getProfile()
@@ -59,84 +59,115 @@ export default function AccountForm({ user }: { user: User | null }) {
     try {
       setLoading(true)
 
-      const { error } = await supabase.from('profiles').upsert({
-        id: user?.id as string,
-        full_name: fullname,
-        username,
-        website,
-        avatar_url,
-        updated_at: new Date().toISOString(),
+      const updates: any = {}
+      if (fullname !== null) updates.full_name = fullname
+      if (username !== null) updates.username = username
+      if (website !== null) updates.website = website
+      if (avatar_url !== null) updates.avatar_url = avatar_url
+
+      const { error } = await supabase.auth.updateUser({
+        data: updates,
       })
+
       if (error) throw error
-      alert('Profile updated!')
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully!",
+      })
     } catch (error) {
-      alert('Error updating the data!')
+      toast({
+        title: "Error",
+        description: "Error updating the data!",
+        variant: "destructive",
+      })
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="form-widget">
-      <Avatar
-        uid={user?.id ?? null}
-        url={avatar_url}
-        size={150}
-        onUpload={(url) => {
-          setAvatarUrl(url)
-          updateProfile({ fullname, username, website, avatar_url: url })
-        }}
-      />
+    <div className="max-w-2xl mx-auto p-6">
+      <Card>
+        <CardHeader className="text-center">
+          <CardTitle>Account Settings</CardTitle>
+          <CardDescription>Manage your profile information and account settings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="flex justify-center">
+            <Avatar
+              uid={user?.id ?? null}
+              url={avatar_url}
+              size={150}
+              onUpload={(url) => {
+                setAvatarUrl(url)
+                updateProfile({ fullname, username, website, avatar_url: url })
+              }}
+            />
+          </div>
 
-      <div>
-        <label htmlFor="email">Email</label>
-        <input id="email" type="text" value={user?.email} disabled />
-      </div>
-      <div>
-        <label htmlFor="fullName">Full Name</label>
-        <input
-          id="fullName"
-          type="text"
-          value={fullname || ''}
-          onChange={(e) => setFullname(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="username">Username</label>
-        <input
-          id="username"
-          type="text"
-          value={username || ''}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-      </div>
-      <div>
-        <label htmlFor="website">Website</label>
-        <input
-          id="website"
-          type="url"
-          value={website || ''}
-          onChange={(e) => setWebsite(e.target.value)}
-        />
-      </div>
+          <Separator />
 
-      <div>
-        <button
-          className="button primary block"
-          onClick={() => updateProfile({ fullname, username, website, avatar_url })}
-          disabled={loading}
-        >
-          {loading ? 'Loading ...' : 'Update'}
-        </button>
-      </div>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={user?.email || ""} disabled className="bg-muted" />
+              <p className="text-xs text-muted-foreground">Your email address cannot be changed</p>
+            </div>
 
-      <div>
-        <form action="/auth/signout" method="post">
-          <button className="button block" type="submit">
-            Sign out
-          </button>
-        </form>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                value={fullname || ""}
+                onChange={(e) => setFullname(e.target.value)}
+                placeholder="Enter your full name"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={username || ""}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your username"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="website">Website</Label>
+              <Input
+                id="website"
+                type="url"
+                value={website || ""}
+                onChange={(e) => setWebsite(e.target.value)}
+                placeholder="https://example.com"
+              />
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button
+              onClick={() => updateProfile({ fullname, username, website, avatar_url })}
+              disabled={loading}
+              className="flex-1"
+            >
+              {loading ? "Updating..." : "Update Profile"}
+            </Button>
+
+            <form action="/auth/signout" method="post" className="flex-1">
+              <Button type="submit" variant="outline" className="w-full" disabled={loading}>
+                Sign Out
+              </Button>
+            </form>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

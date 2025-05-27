@@ -1,7 +1,10 @@
-'use client'
-import React, { useEffect, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
-import Image from 'next/image'
+"use client"
+import type React from "react"
+import { useEffect, useState } from "react"
+import { createClient } from "@/utils/supabase/client"
+import Image from "next/image"
+import { Button } from "@/components/ui/button"
+import { Upload, User } from "lucide-react"
 
 export default function Avatar({
   uid,
@@ -21,7 +24,7 @@ export default function Avatar({
   useEffect(() => {
     async function downloadImage(path: string) {
       try {
-        const { data, error } = await supabase.storage.from('avatars').download(path)
+        const { data, error } = await supabase.storage.from("avatars").download(path)
         if (error) {
           throw error
         }
@@ -29,7 +32,7 @@ export default function Avatar({
         const url = URL.createObjectURL(data)
         setAvatarUrl(url)
       } catch (error) {
-        console.log('Error downloading image: ', error)
+        console.log("Error downloading image: ", error)
       }
     }
 
@@ -41,14 +44,14 @@ export default function Avatar({
       setUploading(true)
 
       if (!event.target.files || event.target.files.length === 0) {
-        throw new Error('You must select an image to upload.')
+        throw new Error("You must select an image to upload.")
       }
 
       const file = event.target.files[0]
-      const fileExt = file.name.split('.').pop()
+      const fileExt = file.name.split(".").pop()
       const filePath = `${uid}-${Math.random()}.${fileExt}`
 
-      const { error: uploadError } = await supabase.storage.from('avatars').upload(filePath, file)
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file)
 
       if (uploadError) {
         throw uploadError
@@ -56,40 +59,48 @@ export default function Avatar({
 
       onUpload(filePath)
     } catch (error) {
-      alert('Error uploading avatar!')
+      alert("Error uploading avatar!")
     } finally {
       setUploading(false)
     }
   }
 
   return (
-    <div>
-      {avatarUrl ? (
-        <Image
-          width={size}
-          height={size}
-          src={avatarUrl}
-          alt="Avatar"
-          className="avatar image"
-          style={{ height: size, width: size }}
-        />
-      ) : (
-        <div className="avatar no-image" style={{ height: size, width: size }} />
-      )}
-      <div style={{ width: size }}>
-        <label className="button primary block" htmlFor="single">
-          {uploading ? 'Uploading ...' : 'Upload'}
-        </label>
+    <div className="flex flex-col items-center space-y-4">
+      <div className="relative">
+        {avatarUrl ? (
+          <Image
+            width={size}
+            height={size}
+            src={avatarUrl || "/placeholder.svg"}
+            alt="Avatar"
+            className="rounded-full object-cover border-4 border-border"
+            style={{ height: size, width: size }}
+          />
+        ) : (
+          <div
+            className="rounded-full bg-muted flex items-center justify-center border-4 border-border"
+            style={{ height: size, width: size }}
+          >
+            <User className="h-12 w-12 text-muted-foreground" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col items-center">
+        <Button variant="outline" size="sm" disabled={uploading} className="relative overflow-hidden" asChild>
+          <label htmlFor="avatar-upload" className="cursor-pointer">
+            <Upload className="h-4 w-4 mr-2" />
+            {uploading ? "Uploading..." : "Upload Avatar"}
+          </label>
+        </Button>
         <input
-          style={{
-            visibility: 'hidden',
-            position: 'absolute',
-          }}
+          id="avatar-upload"
           type="file"
-          id="single"
           accept="image/*"
           onChange={uploadAvatar}
           disabled={uploading}
+          className="sr-only"
         />
       </div>
     </div>
