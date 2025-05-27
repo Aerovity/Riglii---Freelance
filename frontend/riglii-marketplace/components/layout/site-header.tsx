@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { Search, Heart, ArrowRight, BriefcaseBusiness, User } from 'lucide-react'
+import Image from "next/image"
+import { Search, Heart, ArrowRight, BriefcaseBusiness } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import LanguageSelector from "@/components/language-selector"
@@ -33,9 +34,14 @@ export default function SiteHeader() {
       <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="container mx-auto px-4 flex items-center justify-between h-16">
           <div className="flex items-center gap-6 flex-1">
-            <Link href="/" className="text-[#0F2830] font-bold text-2xl flex items-center shrink-0">
-              Riglii
-              <ArrowRight className="h-4 w-4 text-[#00D37F] -ml-0.5 transform rotate-45" />
+            <Link href="/" className="flex items-center shrink-0">
+              <Image
+                src="/Riglii_logo.png"
+                alt="Riglii Logo"
+                width={360}
+                height={120}
+                className="h-20 w-auto"
+              />
             </Link>
             <div className="relative flex items-center flex-1 max-w-xl">
               <Input
