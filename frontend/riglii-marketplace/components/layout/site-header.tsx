@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Search, Heart, ArrowRight, BriefcaseBusiness } from 'lucide-react'
+import { Search, Heart, ArrowRight, BriefcaseBusiness, User } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import LanguageSelector from "@/components/language-selector"
@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import FreelancerOnboarding from "@/components/freelancer-onboarding"
 
@@ -24,9 +25,17 @@ export default function SiteHeader() {
   const { t, language } = useLanguage()
   const isRtl = language === "ar"
   const [showOnboarding, setShowOnboarding] = useState(false)
-  
-  // Replace this with your own authentication logic
-  const [isSignedIn, setIsSignedIn] = useState(false)
+  const router = useRouter()
+
+  const handleLogin = () => {
+    // Open sign-in page in a new tab
+    window.open('/auth/signin', '_blank')
+  }
+
+  const handleRegister = () => {
+    // Open sign-in page in sign-up mode in a new tab
+    window.open('/auth/signin?mode=signup', '_blank')
+  }
 
   return (
     <>
@@ -68,93 +77,31 @@ export default function SiteHeader() {
             </Link>
             <LanguageSelector />
             <div className="flex items-center gap-2">
-              {isSignedIn ? (
-                <>
-                  <NotificationsDropdown />
-                  <MessagesDropdown />
-                  <Button variant="ghost" size="icon" className="text-[#0F2830]">
-                    <Heart className="h-5 w-5" />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">
+                    Get Started
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="text-[#0F2830] hover:text-[#00D37F] flex items-center gap-1"
-                    onClick={() => setShowOnboarding(true)}
-                  >
-                    <BriefcaseBusiness className="h-4 w-4" />
-                    <span>{t("becomeFreelancer") || "Become a Freelancer"}</span>
-                  </Button>
-                  
-                  {/* User Profile Dropdown */}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="relative w-8 h-8 rounded-full">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                          <User className="h-4 w-4 text-gray-600" />
-                        </div>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem>
-                        <Link href="/profile" className="flex items-center w-full">
-                          Profile
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <Link href="/settings" className="flex items-center w-full">
-                          Settings
-                        </Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>
-                        <button 
-                          onClick={() => {
-                            // Add your sign out logic here
-                            setIsSignedIn(false)
-                            // Redirect to home or handle sign out
-                            window.location.href = "/"
-                          }} 
-                          className="flex items-center w-full text-left"
-                        >
-                          Sign Out
-                        </button>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </>
-              ) : (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">
-                      Get Started
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem>
-                      <button 
-                        onClick={() => {
-                          // Add your login logic here
-                          // For now, just toggle the state
-                          setIsSignedIn(true)
-                        }} 
-                        className="flex items-center w-full text-left"
-                      >
-                        Login
-                      </button>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      <button 
-                        onClick={() => {
-                          // Add your register logic here
-                          // For now, just toggle the state
-                          setIsSignedIn(true)
-                        }} 
-                        className="flex items-center w-full text-left"
-                      >
-                        Register
-                      </button>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem>
+                    <button 
+                      onClick={handleLogin} 
+                      className="flex items-center w-full text-left"
+                    >
+                      Login
+                    </button>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    <button 
+                      onClick={handleRegister} 
+                      className="flex items-center w-full text-left"
+                    >
+                      Register
+                    </button>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </nav>
 
@@ -185,13 +132,6 @@ export default function SiteHeader() {
           <CategoriesDropdown />
         </div>
       </div>
-
-      {/* Freelancer Onboarding Dialog */}
-      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden">
-          <FreelancerOnboarding onClose={() => setShowOnboarding(false)} />
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
