@@ -1,4 +1,4 @@
-import { LogoIcon } from '@/components/logo'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,10 +15,16 @@ export default function LoginPage() {
                         <Link
                             href="/mist"
                             aria-label="go home">
-                            <LogoIcon />
+                            <Image
+                                src="/Riglii_logo.png"
+                                alt="Riglii Logo"
+                                width={40}
+                                height={40}
+                                className="h-10 w-auto"
+                            />
                         </Link>
                         <h1 className="mt-6 text-balance text-xl font-semibold">
-                            <span className="text-muted-foreground">Welcome to Tailark!</span> Create an Account to Get Started
+                            <span className="text-muted-foreground">Welcome back to Tailark!</span> Sign in to continue
                         </h1>
                     </div>
 
@@ -117,14 +123,15 @@ export default function LoginPage() {
                         </Button>
                     </div>
                 </div>
+
                 <div className="px-6">
                     <p className="text-muted-foreground text-sm">
-                        Already have an account ?
+                        Don't have an account ?
                         <Button
                             asChild
                             variant="link"
                             className="px-2">
-                            <Link href="#">Sign In</Link>
+                            <Link href="#">Create account</Link>
                         </Button>
                     </p>
                 </div>

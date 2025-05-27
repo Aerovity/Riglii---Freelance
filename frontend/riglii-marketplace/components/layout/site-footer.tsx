@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import { ArrowRight } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "@/app/language-provider"
@@ -140,9 +141,15 @@ export default function SiteFooter() {
 
         <div className="mt-12 pt-8 border-t border-gray-700 flex flex-col md:flex-row justify-between items-center">
           <div className="flex items-center gap-2 mb-4 md:mb-0">
-            <Link href="/" className="text-white font-bold text-xl flex items-center">
-              Riglii
-              <ArrowRight className="h-4 w-4 text-[#00D37F] -ml-0.5 transform rotate-45" />
+            <Link href="/" className="flex items-center">
+              <Image
+                src="/Riglii_logo.png"
+                alt="Riglii Logo"
+                width={100}
+                height={32}
+                className="h-8 w-auto"
+              />
+              <ArrowRight className="h-4 w-4 text-[#00D37F] ml-1 transform rotate-45" />
             </Link>
             <p className="text-sm text-gray-400">© 2025 Riglii Inc.</p>
           </div>
