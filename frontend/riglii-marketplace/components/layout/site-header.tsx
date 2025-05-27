@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Search, Heart, ArrowRight, BriefcaseBusiness } from 'lucide-react'
+import { Search, Heart, ArrowRight, BriefcaseBusiness, User } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import LanguageSelector from "@/components/language-selector"
@@ -9,23 +9,23 @@ import { useLanguage } from "@/app/language-provider"
 import NotificationsDropdown from "@/components/notifications-dropdown"
 import MessagesDropdown from "@/components/messages-dropdown"
 import CategoriesDropdown from "@/components/categories-dropdown"
-import { useUser, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
 import { useState } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import FreelancerOnboarding from "@/components/freelancer-onboarding"
 
 export default function SiteHeader() {
-  const { isSignedIn, user } = useUser()
   const { t, language } = useLanguage()
   const isRtl = language === "ar"
   const [showOnboarding, setShowOnboarding] = useState(false)
+  
+  // Replace this with your own authentication logic
+  const [isSignedIn, setIsSignedIn] = useState(false)
 
   return (
     <>
@@ -62,7 +62,7 @@ export default function SiteHeader() {
             </Link>
             <LanguageSelector />
             <div className="flex items-center gap-2">
-              {isSignedIn && (
+              {isSignedIn ? (
                 <>
                   <NotificationsDropdown />
                   <MessagesDropdown />
@@ -77,36 +77,74 @@ export default function SiteHeader() {
                     <BriefcaseBusiness className="h-4 w-4" />
                     <span>{t("becomeFreelancer") || "Become a Freelancer"}</span>
                   </Button>
+                  
+                  {/* User Profile Dropdown */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative w-8 h-8 rounded-full">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                          <User className="h-4 w-4 text-gray-600" />
+                        </div>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem>
+                        <Link href="/profile" className="flex items-center w-full">
+                          Profile
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <Link href="/settings" className="flex items-center w-full">
+                          Settings
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem>
+                        <button 
+                          onClick={() => {
+                            // Add your sign out logic here
+                            setIsSignedIn(false)
+                            // Redirect to home or handle sign out
+                            window.location.href = "/"
+                          }} 
+                          className="flex items-center w-full text-left"
+                        >
+                          Sign Out
+                        </button>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </>
-              )}
-              
-              {/* Authentication - Profile or Get Started button */}
-              {isSignedIn ? (
-                <UserButton 
-                  afterSignOutUrl="/"
-                  appearance={{
-                    elements: {
-                      userButtonAvatarBox: "w-8 h-8"
-                    }
-                  }}
-                />
               ) : (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button className="bg-[#00D37F] hover:bg-[#00c070] text-white rounded-full px-4 py-2">
-                      {t("getStarted")}
+                    <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">
+                      Get Started
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem className="cursor-pointer">
-                      <SignInButton mode="modal">
-                        <div className="w-full">{t("login") || "Sign In"}</div>
-                      </SignInButton>
+                    <DropdownMenuItem>
+                      <button 
+                        onClick={() => {
+                          // Add your login logic here
+                          // For now, just toggle the state
+                          setIsSignedIn(true)
+                        }} 
+                        className="flex items-center w-full text-left"
+                      >
+                        Login
+                      </button>
                     </DropdownMenuItem>
-                    <DropdownMenuItem className="cursor-pointer">
-                      <SignUpButton mode="modal">
-                        <div className="w-full">{t("register") || "Sign Up"}</div>
-                      </SignUpButton>
+                    <DropdownMenuItem>
+                      <button 
+                        onClick={() => {
+                          // Add your register logic here
+                          // For now, just toggle the state
+                          setIsSignedIn(true)
+                        }} 
+                        className="flex items-center w-full text-left"
+                      >
+                        Register
+                      </button>
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

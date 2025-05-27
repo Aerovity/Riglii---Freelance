@@ -10,7 +10,7 @@ import { useLanguage } from "@/app/language-provider"
 export default function CategoryPage() {
   const params = useParams()
   const { t } = useLanguage()
-  const category = (params.category as string).replace(/-/g, " ")
+  const category = ((params?.category as string) || '').replace(/-/g, " ")
 
   // Logo styles for the horizontal scroll
   const logoStyles = [
