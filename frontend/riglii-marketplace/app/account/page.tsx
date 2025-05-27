@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
+import { createClient } from '@/utils/supabase/client'
+import { type User } from '@supabase/supabase-js'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,37 +10,171 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
-import { User, Mail, Globe, Phone, MapPin } from "lucide-react"
+import { User as UserIcon, Mail, Phone, MapPin, CreditCard, Upload } from "lucide-react"
 
-export default function AccountPage() {
-  const [loading, setLoading] = useState(false)
+interface AccountPageProps {
+  user: User | null
+}
+
+export default function AccountPage({ user }: AccountPageProps) {
+  const supabase = createClient()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [loading, setLoading] = useState(true)
+  const [uploading, setUploading] = useState(false)
+  
   const [profile, setProfile] = useState({
-    name: "John Doe",
-    email: "john.doe@example.com",
-    username: "johndoe",
-    bio: "Software developer passionate about creating amazing user experiences.",
-    website: "https://johndoe.dev",
-    phone: "+1 (555) 123-4567",
-    location: "San Francisco, CA",
-    avatar: "/placeholder.svg?height=100&width=100",
+    full_name: "",
+    email: user?.email || "",
+    username: "",
+    bio: "",
+    matriculation_number: "",
+    phone: "",
+    location: "",
+    avatar_url: "",
   })
+
+  const getProfile = useCallback(async () => {
+    try {
+      setLoading(true)
+
+      const { data, error, status } = await supabase
+        .from('profiles')
+        .select(`full_name, username, bio, matriculation_number, phone, location, avatar_url`)
+        .eq('id', user?.id)
+        .single()
+
+      if (error && status !== 406) {
+        console.log(error)
+        throw error
+      }
+
+      if (data) {
+        setProfile(prev => ({
+          ...prev,
+          full_name: data.full_name || "",
+          username: data.username || "",
+          bio: data.bio || "",
+          matriculation_number: data.matriculation_number || "",
+          phone: data.phone || "",
+          location: data.location || "",
+          avatar_url: data.avatar_url || "",
+        }))
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error)
+      alert('Error loading user data!')
+    } finally {
+      setLoading(false)
+    }
+  }, [user, supabase])
+
+  useEffect(() => {
+    if (user) {
+      getProfile()
+    }
+  }, [user, getProfile])
 
   const handleInputChange = (field: string, value: string) => {
     setProfile((prev) => ({ ...prev, [field]: value }))
   }
 
-  const handleUpdateProfile = async () => {
-    setLoading(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setLoading(false)
-    // Show success message or handle response
-    console.log("Profile updated:", profile)
+  const uploadAvatar = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true)
+
+      if (!event.target.files || event.target.files.length === 0) {
+        throw new Error('You must select an image to upload.')
+      }
+
+      const file = event.target.files[0]
+      const fileExt = file.name.split('.').pop()
+      const filePath = `${user?.id}-${Math.random()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) {
+        throw uploadError
+      }
+
+      const { data } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      setProfile(prev => ({ ...prev, avatar_url: data.publicUrl }))
+    } catch (error) {
+      alert('Error uploading avatar!')
+      console.error('Error uploading avatar:', error)
+    } finally {
+      setUploading(false)
+    }
   }
 
-  const handleSignOut = () => {
-    // Handle sign out logic
-    console.log("Signing out...")
+  const handleUpdateProfile = async () => {
+    try {
+      setLoading(true)
+
+      const { error } = await supabase.from('profiles').upsert({
+        id: user?.id as string,
+        full_name: profile.full_name,
+        username: profile.username,
+        bio: profile.bio,
+        matriculation_number: profile.matriculation_number,
+        phone: profile.phone,
+        location: profile.location,
+        avatar_url: profile.avatar_url,
+        updated_at: new Date().toISOString(),
+      })
+
+      if (error) throw error
+      alert('Profile updated successfully!')
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      alert('Error updating the profile!')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSignOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw error
+    } catch (error) {
+      console.error('Error signing out:', error)
+      alert('Error signing out!')
+    }
+  }
+
+  const handleDeleteAccount = async () => {
+    if (window.confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+      try {
+        // First delete the profile
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .delete()
+          .eq('id', user?.id)
+
+        if (profileError) throw profileError
+
+        // Then delete the user account (this might require admin privileges)
+        alert('Account deletion initiated. Please contact support if you need assistance.')
+      } catch (error) {
+        console.error('Error deleting account:', error)
+        alert('Error deleting account!')
+      }
+    }
+  }
+
+  if (!user) {
+    return (
+      <div className="container max-w-4xl mx-auto py-8 px-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold">Please sign in to access your account settings</h1>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -54,7 +190,7 @@ export default function AccountPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
+              <UserIcon className="h-5 w-5" />
               Profile Information
             </CardTitle>
             <CardDescription>Update your personal information and profile details.</CardDescription>
@@ -63,18 +199,35 @@ export default function AccountPage() {
             {/* Avatar Section */}
             <div className="flex items-center gap-4">
               <Avatar className="h-20 w-20">
-                <AvatarImage src={profile.avatar || "/placeholder.svg"} alt={profile.name} />
+                <AvatarImage src={profile.avatar_url || "/placeholder.svg"} alt={profile.full_name} />
                 <AvatarFallback className="text-lg">
-                  {profile.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {profile.full_name
+                    ? profile.full_name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                    : "?"}
                 </AvatarFallback>
               </Avatar>
               <div className="space-y-2">
-                <Button variant="outline" size="sm">
-                  Change Avatar
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="h-4 w-4" />
+                  {uploading ? 'Uploading...' : 'Change Avatar'}
                 </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={uploadAvatar}
+                  className="hidden"
+                />
                 <p className="text-sm text-muted-foreground">JPG, GIF or PNG. 1MB max.</p>
               </div>
             </div>
@@ -84,11 +237,11 @@ export default function AccountPage() {
             {/* Form Fields */}
             <div className="grid gap-6 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="full_name">Full Name</Label>
                 <Input
-                  id="name"
-                  value={profile.name}
-                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  id="full_name"
+                  value={profile.full_name}
+                  onChange={(e) => handleInputChange("full_name", e.target.value)}
                   placeholder="Enter your full name"
                 />
               </div>
@@ -112,8 +265,8 @@ export default function AccountPage() {
                   id="email"
                   type="email"
                   value={profile.email}
-                  onChange={(e) => handleInputChange("email", e.target.value)}
-                  placeholder="Enter your email"
+                  disabled
+                  className="bg-muted"
                 />
               </div>
 
@@ -131,15 +284,15 @@ export default function AccountPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="website" className="flex items-center gap-2">
-                  <Globe className="h-4 w-4" />
-                  Website
+                <Label htmlFor="matriculation_number" className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  National Matriculation Number
                 </Label>
                 <Input
-                  id="website"
-                  value={profile.website}
-                  onChange={(e) => handleInputChange("website", e.target.value)}
-                  placeholder="Enter your website URL"
+                  id="matriculation_number"
+                  value={profile.matriculation_number}
+                  onChange={(e) => handleInputChange("matriculation_number", e.target.value)}
+                  placeholder="Enter your matriculation number"
                 />
               </div>
 
@@ -190,7 +343,7 @@ export default function AccountPage() {
 
             <div className="space-y-2">
               <h4 className="text-sm font-medium text-destructive">Danger Zone</h4>
-              <Button variant="destructive" size="sm">
+              <Button variant="destructive" size="sm" onClick={handleDeleteAccount}>
                 Delete Account
               </Button>
               <p className="text-xs text-muted-foreground">
