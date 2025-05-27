@@ -29,12 +29,12 @@ export default function SiteHeader() {
 
   const handleLogin = () => {
     // Open sign-in page in a new tab
-    window.open('/auth/signin', '_blank')
+    window.open('/login')
   }
 
   const handleRegister = () => {
     // Open sign-in page in sign-up mode in a new tab
-    window.open('/auth/signin?mode=signup', '_blank')
+    window.open('/login?mode=signup')
   }
 
   return (

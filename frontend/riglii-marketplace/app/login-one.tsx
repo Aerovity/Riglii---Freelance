@@ -1,10 +1,11 @@
+// app/login-one/page.tsx
 import { LogoIcon } from '@/components/logo'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 
-export default function LoginPage() {
+export default function LoginOnePage() {
     return (
         <section className="bg-linear-to-b from-muted to-background flex min-h-screen px-4 py-16 md:py-32">
             <form
@@ -13,12 +14,12 @@ export default function LoginPage() {
                 <div className="p-6">
                     <div>
                         <Link
-                            href="/mist"
+                            href="/"
                             aria-label="go home">
                             <LogoIcon />
                         </Link>
                         <h1 className="mt-6 text-balance text-xl font-semibold">
-                            <span className="text-muted-foreground">Welcome back to Tailark!</span> Sign in to continue
+                            <span className="text-muted-foreground">Welcome back to Riglii!</span> Sign in to continue
                         </h1>
                     </div>
 
@@ -125,7 +126,7 @@ export default function LoginPage() {
                             asChild
                             variant="link"
                             className="px-2">
-                            <Link href="#">Create account</Link>
+                            <Link href="/sign-up-one">Create account</Link>
                         </Button>
                     </p>
                 </div>
