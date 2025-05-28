@@ -6,6 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
   Star,
   ChevronLeft,
   ChevronRight,
@@ -16,6 +21,8 @@ import {
   Share2,
   Award,
   Download,
+  X,
+  Maximize2,
 } from "lucide-react"
 
 interface FreelancerProfile {
@@ -69,35 +76,54 @@ export default function FreelancerProfileView({
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [portfolioImageUrls, setPortfolioImageUrls] = useState<string[]>([])
   const [certificateUrls, setCertificateUrls] = useState<string[]>([])
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false)
   const supabase = createClient()
 
+  // Get the Supabase project URL for constructing direct URLs
+  const getSupabaseUrl = () => {
+    // This gets the URL from your Supabase client configuration
+    const { url } = supabase.storage.from("avatars")
+    return url || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  }
+
   // Function to download avatar image from Supabase storage using user ID
+  // This avatar is stored in the "avatars" bucket and cannot be changed or replaced
   const downloadAvatar = async (userId: string) => {
     try {
-      // Try common image extensions
-      const extensions = ["jpg", "jpeg", "png", "webp"]
+      // Try different path structures that might exist
+      const possiblePaths = [
+        `${userId}/avatar.webp`,
+        `${userId}/avatar.jpg`,
+        `${userId}/avatar.jpeg`,
+        `${userId}/avatar.png`,
+        `${userId}/avatar.gif`,
+        `${userId}.webp`,
+        `${userId}.jpg`,
+        `${userId}.jpeg`,
+        `${userId}.png`,
+        `${userId}.gif`
+      ]
 
-      for (const ext of extensions) {
+      for (const path of possiblePaths) {
         try {
-          const path = `${userId}.${ext}`
-          const { data, error } = await supabase.storage.from("avatars").download(path)
+          const { data, error } = await supabase.storage.from('avatars').download(path)
           if (!error && data) {
             const url = URL.createObjectURL(data)
             setAvatarUrl(url)
-            console.log(`Avatar found with extension: ${ext}`)
+            console.log(`Avatar found at path: ${path}`)
             return
           }
         } catch (err) {
-          // Continue to next extension
+          // Continue to next path
           continue
         }
       }
 
-      // If no avatar found with any extension
+      // If no avatar found with any path
       console.log("No avatar found for user:", userId)
       setAvatarUrl(null)
     } catch (error) {
-      console.log("Error downloading avatar image: ", error)
+      console.log('Error downloading avatar image: ', error)
       setAvatarUrl(null)
     }
   }
@@ -158,13 +184,23 @@ export default function FreelancerProfileView({
     }
   }
 
-  // Download images on component mount
+  // Download avatar on component mount or when user_id changes
   useEffect(() => {
-    // Download avatar using user ID
+    // Download avatar using user ID - this is immutable and from the avatars bucket
     if (profile.user_id) {
       downloadAvatar(profile.user_id)
     }
 
+    // Cleanup function to revoke object URL when component unmounts
+    return () => {
+      if (avatarUrl && avatarUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(avatarUrl)
+      }
+    }
+  }, [profile.user_id])
+
+  // Download portfolio and certificates on component mount
+  useEffect(() => {
     if (portfolioImages.length > 0) {
       downloadPortfolioImages()
     }
@@ -173,11 +209,8 @@ export default function FreelancerProfileView({
       downloadCertificates()
     }
 
-    // Cleanup function
+    // Cleanup function for portfolio and certificate URLs only
     return () => {
-      if (avatarUrl) {
-        URL.revokeObjectURL(avatarUrl)
-      }
       portfolioImageUrls.forEach((url) => {
         if (url.startsWith("blob:")) {
           URL.revokeObjectURL(url)
@@ -189,7 +222,7 @@ export default function FreelancerProfileView({
         }
       })
     }
-  }, [profile.user_id, portfolioImages, certificates])
+  }, [portfolioImages, certificates])
 
   const displayName =
     profile.display_name ||
@@ -210,6 +243,24 @@ export default function FreelancerProfileView({
   const prevImage = () => {
     setCurrentImageIndex((prev) => (prev === 0 ? portfolioImageUrls.length - 1 : prev - 1))
   }
+
+  // Keyboard navigation for lightbox
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (!isLightboxOpen) return
+      
+      if (e.key === "ArrowRight") {
+        nextImage()
+      } else if (e.key === "ArrowLeft") {
+        prevImage()
+      } else if (e.key === "Escape") {
+        setIsLightboxOpen(false)
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyPress)
+    return () => window.removeEventListener("keydown", handleKeyPress)
+  }, [isLightboxOpen, portfolioImageUrls.length])
 
   const getUserInitials = () => {
     const fullName = userData?.user_metadata?.full_name || userData?.user_metadata?.name
@@ -238,8 +289,17 @@ export default function FreelancerProfileView({
                 <CardContent className="p-6">
                   <div className="text-center space-y-4">
                     <Avatar className="w-24 h-24 mx-auto">
-                      <AvatarImage src={avatarUrl || ""} alt={displayName} />
-                      <AvatarFallback className="text-2xl bg-[#00D37F] text-white">{getUserInitials()}</AvatarFallback>
+                      <AvatarImage 
+                        src={avatarUrl || ""} 
+                        alt={displayName}
+                        onError={(e) => {
+                          console.error("Avatar image failed to load, trying fallback")
+                          // Don't hide the image, let the fallback show
+                        }}
+                      />
+                      <AvatarFallback className="text-2xl bg-[#00D37F] text-white">
+                        {getUserInitials()}
+                      </AvatarFallback>
                     </Avatar>
 
                     <div>
@@ -328,16 +388,22 @@ export default function FreelancerProfileView({
                   </CardHeader>
                   <CardContent>
                     <div className="relative">
-                      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                      <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden group cursor-pointer"
+                           onClick={() => setIsLightboxOpen(true)}>
                         <img
                           src={portfolioImageUrls[currentImageIndex] || "/placeholder.svg?height=400&width=600"}
                           alt={`Portfolio image ${currentImageIndex + 1}`}
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                           onError={(e) => {
                             console.error("Error loading portfolio image at index:", currentImageIndex)
                             e.currentTarget.src = "/placeholder.svg?height=400&width=600"
                           }}
                         />
+                        
+                        {/* Overlay on hover */}
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center">
+                          <Maximize2 className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                        </div>
                       </div>
 
                       {portfolioImageUrls.length > 1 && (
@@ -346,7 +412,10 @@ export default function FreelancerProfileView({
                             variant="outline"
                             size="icon"
                             className="absolute left-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white"
-                            onClick={prevImage}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              prevImage()
+                            }}
                           >
                             <ChevronLeft className="w-4 h-4" />
                           </Button>
@@ -354,7 +423,10 @@ export default function FreelancerProfileView({
                             variant="outline"
                             size="icon"
                             className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-white/80 hover:bg-white"
-                            onClick={nextImage}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              nextImage()
+                            }}
                           >
                             <ChevronRight className="w-4 h-4" />
                           </Button>
@@ -367,7 +439,10 @@ export default function FreelancerProfileView({
                                   className={`w-2 h-2 rounded-full transition-colors ${
                                     index === currentImageIndex ? "bg-white" : "bg-white/50"
                                   }`}
-                                  onClick={() => setCurrentImageIndex(index)}
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setCurrentImageIndex(index)
+                                  }}
                                 />
                               ))}
                             </div>
@@ -379,13 +454,106 @@ export default function FreelancerProfileView({
                     {portfolioImageUrls.length > 1 && (
                       <div className="mt-4">
                         <p className="text-sm text-gray-600 text-center">
-                          {currentImageIndex + 1} of {portfolioImageUrls.length} images
+                          {currentImageIndex + 1} of {portfolioImageUrls.length} images • Click to view fullscreen
                         </p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               )}
+
+              {/* Lightbox Modal */}
+              <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
+                <DialogContent className="max-w-[95vw] w-full max-h-[95vh] h-full p-0 bg-black/95 border-none overflow-hidden">
+                  <DialogTitle className="sr-only">Portfolio Image View</DialogTitle>
+                  
+                  {/* Close button */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-4 top-4 z-50 text-white hover:bg-white/20"
+                    onClick={() => setIsLightboxOpen(false)}
+                  >
+                    <X className="w-5 h-5" />
+                  </Button>
+
+                  {/* Image counter */}
+                  {portfolioImageUrls.length > 1 && (
+                    <div className="absolute left-4 top-4 z-50 text-white bg-black/50 px-3 py-1 rounded-full text-sm">
+                      {currentImageIndex + 1} / {portfolioImageUrls.length}
+                    </div>
+                  )}
+
+                  {/* Main image container */}
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    {/* Padding area for navigation and thumbnails */}
+                    <div className="w-full h-full flex items-center justify-center p-16 pb-32">
+                      <img
+                        src={portfolioImageUrls[currentImageIndex] || "/placeholder.svg?height=800&width=1200"}
+                        alt={`Portfolio image ${currentImageIndex + 1}`}
+                        className="w-full h-full object-contain"
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '100%',
+                          width: 'auto',
+                          height: 'auto'
+                        }}
+                        onError={(e) => {
+                          console.error("Error loading fullscreen portfolio image")
+                          e.currentTarget.src = "/placeholder.svg?height=800&width=1200"
+                        }}
+                      />
+                    </div>
+
+                    {/* Navigation buttons */}
+                    {portfolioImageUrls.length > 1 && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"
+                          onClick={prevImage}
+                        >
+                          <ChevronLeft className="w-8 h-8" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:bg-white/20 h-12 w-12"
+                          onClick={nextImage}
+                        >
+                          <ChevronRight className="w-8 h-8" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Thumbnail strip at bottom */}
+                  {portfolioImageUrls.length > 1 && (
+                    <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-4">
+                      <div className="flex gap-2 justify-center overflow-x-auto max-w-full pb-2">
+                        {portfolioImageUrls.map((url, index) => (
+                          <button
+                            key={index}
+                            className={`flex-shrink-0 w-20 h-20 rounded overflow-hidden border-2 transition-all ${
+                              index === currentImageIndex 
+                                ? "border-white opacity-100" 
+                                : "border-transparent opacity-60 hover:opacity-80"
+                            }`}
+                            onClick={() => setCurrentImageIndex(index)}
+                          >
+                            <img
+                              src={url || "/placeholder.svg?height=80&width=80"}
+                              alt={`Thumbnail ${index + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
 
               {/* About Section */}
               <Card>
