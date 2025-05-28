@@ -22,7 +22,7 @@ interface FreelancerProfile {
   occupation: string | null
   custom_occupation: string | null
   profile_picture_url: string | null
-  hourly_rate: number | null
+  price: number | null  // Changed from hourly_rate to price
   portfolio_images: string[]
 }
 
@@ -33,16 +33,16 @@ export default function FreelancerEditForm({ user }: { user: User | null }) {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [profile, setProfile] = useState<FreelancerProfile>({
-    first_name: null,
-    last_name: null,
-    display_name: null,
-    description: null,
-    occupation: null,
-    custom_occupation: null,
-    profile_picture_url: null,
-    hourly_rate: null,
-    portfolio_images: []
-  })
+  first_name: null,
+  last_name: null,
+  display_name: null,
+  description: null,
+  occupation: null,
+  custom_occupation: null,
+  profile_picture_url: null,
+  price: null,  // Changed from hourly_rate to price
+  portfolio_images: []
+})
 
   const getProfile = useCallback(async () => {
     try {
@@ -58,20 +58,19 @@ export default function FreelancerEditForm({ user }: { user: User | null }) {
         throw error
       }
 
-      if (data) {
+    if (data) {
         setProfile({
-          first_name: data.first_name,
-          last_name: data.last_name,
-          display_name: data.display_name,
-          description: data.description,
-          occupation: data.occupation,
-          custom_occupation: data.custom_occupation,
-          profile_picture_url: data.profile_picture_url,
-          hourly_rate: data.hourly_rate,
-          portfolio_images: data.portfolio_images || []
-        })
-      }
-    } catch (error) {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        display_name: data.display_name,
+        description: data.description,
+        occupation: data.occupation,
+        custom_occupation: data.custom_occupation,
+        profile_picture_url: data.profile_picture_url,
+        price: data.price,  // Changed from hourly_rate to price
+        portfolio_images: data.portfolio_images || []
+    })
+    }} catch (error) {
       console.error('Error loading profile:', error)
       toast({
         title: "Error",
@@ -220,7 +219,7 @@ export default function FreelancerEditForm({ user }: { user: User | null }) {
         occupation: profile.occupation,
         custom_occupation: profile.custom_occupation,
         profile_picture_url: profile.profile_picture_url,
-        hourly_rate: profile.hourly_rate,
+        hourly_rate: profile.price,
         portfolio_images: profile.portfolio_images,
         updated_at: new Date().toISOString(),
       }
@@ -318,15 +317,18 @@ export default function FreelancerEditForm({ user }: { user: User | null }) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="displayName">Display Name</Label>
-                <Input
-                  id="displayName"
-                  value={profile.display_name || ""}
-                  onChange={(e) => setProfile(prev => ({ ...prev, display_name: e.target.value }))}
-                  placeholder="How you want to be displayed to clients"
-                />
-              </div>
+            <div className="space-y-2">
+            <Label htmlFor="price">Price ($)</Label>
+            <Input
+                id="price"
+                type="number"
+                min="1"
+                step="0.01"
+                value={profile.price || ""}
+                onChange={(e) => setProfile(prev => ({ ...prev, price: parseFloat(e.target.value) || null }))}
+                placeholder="Enter your price"
+            />
+            </div>
 
               <div className="space-y-2">
                 <Label htmlFor="occupation">Occupation</Label>
@@ -369,7 +371,7 @@ export default function FreelancerEditForm({ user }: { user: User | null }) {
                   type="number"
                   min="1"
                   step="0.01"
-                  value={profile.hourly_rate || ""}
+                  value={profile.price || ""}
                   onChange={(e) => setProfile(prev => ({ ...prev, hourly_rate: parseFloat(e.target.value) || null }))}
                   placeholder="Enter your hourly rate"
                 />
