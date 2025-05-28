@@ -24,18 +24,97 @@ export default function CategoryPage() {
     { id: 8, name: "Signature", icon: "✍️" },
   ]
 
-  // Sample gigs data
-  const gigs = Array(8).fill(null).map((_, i) => ({
-    id: i + 1,
-    title: `I will create a professional ${category.toLowerCase()} design`,
-    seller: {
-      name: `Seller ${i + 1}`,
-      level: Math.floor(Math.random() * 3) + 1,
-      rating: (4 + Math.random()).toFixed(1),
-      reviews: Math.floor(Math.random() * 1000) + 100,
+  // Sample gigs data - Using static values instead of Math.random()
+  const gigs = [
+    {
+      id: 1,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 1",
+        level: 2,
+        rating: "4.8",
+        reviews: 567,
+      },
+      price: 2500,
     },
-    price: Math.floor(Math.random() * 5000) + 1000,
-  }))
+    {
+      id: 2,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 2",
+        level: 3,
+        rating: "4.9",
+        reviews: 892,
+      },
+      price: 3200,
+    },
+    {
+      id: 3,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 3",
+        level: 1,
+        rating: "4.5",
+        reviews: 234,
+      },
+      price: 1800,
+    },
+    {
+      id: 4,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 4",
+        level: 2,
+        rating: "4.7",
+        reviews: 445,
+      },
+      price: 2800,
+    },
+    {
+      id: 5,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 5",
+        level: 3,
+        rating: "5.0",
+        reviews: 1023,
+      },
+      price: 4500,
+    },
+    {
+      id: 6,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 6",
+        level: 1,
+        rating: "4.6",
+        reviews: 189,
+      },
+      price: 1500,
+    },
+    {
+      id: 7,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 7",
+        level: 2,
+        rating: "4.8",
+        reviews: 678,
+      },
+      price: 3000,
+    },
+    {
+      id: 8,
+      title: `I will create a professional ${category.toLowerCase()} design`,
+      seller: {
+        name: "Seller 8",
+        level: 3,
+        rating: "4.9",
+        reviews: 756,
+      },
+      price: 3800,
+    },
+  ]
 
   return (
     <div>
