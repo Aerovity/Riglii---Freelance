@@ -162,7 +162,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
         ...formData,
         languages: [...formData.languages, { ...newLanguage }],
       })
-      setNewLanguage({ language: "", level: "Basic" })
+      setNewLanguage({ language: "", proficiency_level: "Basic" })
     }
   }
 
@@ -282,16 +282,11 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
         idCardPath = fileName
       }
 
-      // Debug: Check auth status
-      const { data: authDebug, error: authDebugError } = await supabase
-        .rpc('debug_auth_info')
-      
-      console.log('Auth Debug Info:', authDebug)
-      console.log('User ID from user object:', user.id)
-      
-      if (authDebugError) {
-        console.error('Auth debug error:', authDebugError)
-      }
+      console.log('User ID from user object:', userId)
+      console.log('Session user ID:', session.user.id)
+
+      // Check if profile already exists - handle the duplicate key error gracefully
+      // We'll let the insert fail if profile exists and handle it in the error catch
 
       // 2. Insert main freelancer profile
       const { data: profileData, error: profileError } = await supabase
