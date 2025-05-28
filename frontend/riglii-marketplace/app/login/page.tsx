@@ -9,10 +9,18 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { login, signup } from './action'
 
+// Type for action results
+type ActionResult = {
+    error: string;
+    needsVerification?: boolean;
+    email?: string;
+}
+
 export default function SignInPage() {
     const searchParams = useSearchParams()
     const router = useRouter()
-    const mode = searchParams.get('mode')
+    const mode = searchParams?.get('mode')
+    const verified = searchParams?.get('verified')
     const [isSignUp, setIsSignUp] = useState(mode === 'signup')
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
@@ -20,15 +28,28 @@ export default function SignInPage() {
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState('')
+    const [successMessage, setSuccessMessage] = useState('')
 
     // Update isSignUp when URL parameter changes
     useEffect(() => {
         setIsSignUp(mode === 'signup')
     }, [mode])
 
+    // Show success message if email was just verified
+    useEffect(() => {
+        if (verified === 'true') {
+            setSuccessMessage('Email verified successfully! Please sign in to continue.')
+            // Clean up the URL
+            const newUrl = new URL(window.location.href)
+            newUrl.searchParams.delete('verified')
+            window.history.replaceState({}, '', newUrl)
+        }
+    }, [verified])
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setError('')
+        setSuccessMessage('')
         setIsLoading(true)
 
         // Client-side validation for signup
@@ -43,13 +64,31 @@ export default function SignInPage() {
             formData.append('email', email)
             formData.append('password', password)
 
+            let result
             if (isSignUp) {
-                await signup(formData)
+                result = await signup(formData)
             } else {
-                await login(formData)
+                result = await login(formData)
             }
+
+            // Check if we got an error response
+            if (result && 'error' in result) {
+                const actionResult = result as ActionResult
+                setError(actionResult.error)
+                
+                // If email needs verification, optionally redirect
+                if (actionResult.needsVerification && actionResult.email) {
+                    setTimeout(() => {
+                        router.push(`/auth/verify-email?email=${encodeURIComponent(result.email)}`)
+                    }, 2000)
+                }
+                
+                setIsLoading(false)
+            }
+            // If no error returned, the action will handle the redirect
         } catch (err) {
-            setError('An error occurred. Please try again.')
+            console.error('Form submission error:', err)
+            setError('An unexpected error occurred. Please try again.')
             setIsLoading(false)
         }
     }
@@ -86,6 +125,12 @@ export default function SignInPage() {
                                 : 'Sign in to continue to Riglii'}
                         </p>
                     </div>
+
+                    {successMessage && (
+                        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                            <p className="text-sm text-green-600">{successMessage}</p>
+                        </div>
+                    )}
 
                     {error && (
                         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
