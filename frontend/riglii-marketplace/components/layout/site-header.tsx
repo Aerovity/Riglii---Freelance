@@ -30,7 +30,23 @@ export default function SiteHeader() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const supabase = createClient()
+
+  // Function to download avatar image from Supabase storage
+  const downloadAvatar = async (path: string) => {
+    try {
+      const { data, error } = await supabase.storage.from('avatars').download(path)
+      if (error) {
+        throw error
+      }
+      const url = URL.createObjectURL(data)
+      setAvatarUrl(url)
+    } catch (error) {
+      console.log('Error downloading avatar image: ', error)
+      setAvatarUrl(null)
+    }
+  }
 
   useEffect(() => {
     // Get initial user
@@ -40,6 +56,11 @@ export default function SiteHeader() {
       } = await supabase.auth.getUser()
       setUser(user)
       setLoading(false)
+      
+      // Download avatar if user has one
+      if (user?.user_metadata?.avatar_url) {
+        downloadAvatar(user.user_metadata.avatar_url)
+      }
     }
 
     getUser()
@@ -50,23 +71,65 @@ export default function SiteHeader() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
+      
+      // Download avatar for new user or clear avatar if user logged out
+      if (session?.user?.user_metadata?.avatar_url) {
+        downloadAvatar(session.user.user_metadata.avatar_url)
+      } else {
+        // Clean up old avatar URL
+        if (avatarUrl) {
+          URL.revokeObjectURL(avatarUrl)
+        }
+        setAvatarUrl(null)
+      }
     })
 
-    return () => subscription.unsubscribe()
+    // Cleanup function
+    return () => {
+      subscription.unsubscribe()
+      if (avatarUrl) {
+        URL.revokeObjectURL(avatarUrl)
+      }
+    }
   }, [supabase.auth])
 
+  // Listen for user metadata changes (like avatar updates)
+  useEffect(() => {
+    if (user?.user_metadata?.avatar_url) {
+      // Clean up previous avatar URL
+      if (avatarUrl) {
+        URL.revokeObjectURL(avatarUrl)
+      }
+      downloadAvatar(user.user_metadata.avatar_url)
+    } else {
+      // Clean up avatar URL if no avatar
+      if (avatarUrl) {
+        URL.revokeObjectURL(avatarUrl)
+      }
+      setAvatarUrl(null)
+    }
+  }, [user?.user_metadata?.avatar_url])
+
   const handleSignOut = async () => {
+    // Clean up avatar URL before signing out
+    if (avatarUrl) {
+      URL.revokeObjectURL(avatarUrl)
+      setAvatarUrl(null)
+    }
     await supabase.auth.signOut()
   }
 
   const getUserInitials = (user: User) => {
-    const fullName = user.user_metadata?.full_name || user.email
+    const fullName = user.user_metadata?.full_name || user.user_metadata?.name
     if (fullName) {
       const names = fullName.split(" ")
       if (names.length >= 2) {
         return `${names[0][0]}${names[1][0]}`.toUpperCase()
       }
       return fullName.slice(0, 2).toUpperCase()
+    }
+    if (user.email) {
+      return user.email.slice(0, 2).toUpperCase()
     }
     return "U"
   }
@@ -122,7 +185,7 @@ export default function SiteHeader() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt="Profile" />
+                      <AvatarImage src={avatarUrl || ""} alt="Profile" />
                       <AvatarFallback className="bg-[#00D37F] text-white text-sm font-medium">
                         {getUserInitials(user)}
                       </AvatarFallback>
@@ -132,7 +195,7 @@ export default function SiteHeader() {
                 <DropdownMenuContent className="w-56" align="end" forceMount>
                   <div className="flex items-center justify-start gap-2 p-2">
                     <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{user.user_metadata?.full_name || "User"}</p>
+                      <p className="font-medium">{user.user_metadata?.full_name || user.user_metadata?.name || "User"}</p>
                       <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
                     </div>
                   </div>
