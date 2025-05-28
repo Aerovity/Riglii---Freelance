@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
+import Avatar from "./avatar"
 
 export default function AccountForm({ user }: { user: User | null }) {
   const supabase = createClient()
@@ -47,6 +48,7 @@ export default function AccountForm({ user }: { user: User | null }) {
 
   async function updateProfile({
     username,
+    fullname,
     website,
     avatar_url,
   }: {
@@ -93,6 +95,21 @@ export default function AccountForm({ user }: { user: User | null }) {
           <CardDescription>Manage your profile information and account settings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Avatar Section */}
+          <div className="flex justify-center mb-6">
+            <Avatar
+              uid={user?.id ?? null}
+              url={avatar_url}
+              size={120}
+              onUpload={(url) => {
+                setAvatarUrl(url)
+                updateProfile({ fullname, username, website, avatar_url: url })
+              }}
+            />
+          </div>
+
+          <Separator />
+
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
