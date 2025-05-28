@@ -1,120 +1,245 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import Image from "next/image"
+import { useState, useEffect } from "react"
+import { createClient } from "@/utils/supabase/client"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ChevronRight, Star, Heart } from 'lucide-react'
+import { ChevronRight, ChevronLeft } from "lucide-react"
 import { useLanguage } from "@/app/language-provider"
+import FreelancerCard from "@/components/freelancer-card"
+
+interface FreelancerData {
+  id: string
+  user_id: string
+  first_name: string | null
+  last_name: string | null
+  display_name: string | null
+  description: string | null
+  occupation: string | null
+  custom_occupation: string | null
+  price: number | null
+  users?: {
+    email: string
+    user_metadata?: {
+      full_name?: string
+      name?: string
+    }
+  }
+}
+
+type SortOption = "default" | "price_low_high" | "price_high_low"
 
 export default function CategoryPage() {
   const params = useParams()
   const { t } = useLanguage()
-  const category = ((params?.category as string) || '').replace(/-/g, " ")
+  const category = ((params?.category as string) || "").replace(/-/g, " ")
 
-  // Logo styles for the horizontal scroll
-  const logoStyles = [
-    { id: 1, name: "Minimalist", icon: "🎯" },
-    { id: 2, name: "Hand-drawn", icon: "✏️" },
-    { id: 3, name: "Vintage", icon: "🎨" },
-    { id: 4, name: "Cartoon", icon: "🎭" },
-    { id: 5, name: "3D", icon: "💫" },
-    { id: 6, name: "Lettering", icon: "📝" },
-    { id: 7, name: "Geometric", icon: "⬡" },
-    { id: 8, name: "Signature", icon: "✍️" },
-  ]
+  const [freelancers, setFreelancers] = useState<FreelancerData[]>([])
+  const [loading, setLoading] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalCount, setTotalCount] = useState(0)
+  const [sortBy, setSortBy] = useState<SortOption>("default")
 
-  // Sample gigs data - Using static values instead of Math.random()
-  const gigs = [
-    {
-      id: 1,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 1",
-        level: 2,
-        rating: "4.8",
-        reviews: 567,
-      },
-      price: 2500,
-    },
-    {
-      id: 2,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 2",
-        level: 3,
-        rating: "4.9",
-        reviews: 892,
-      },
-      price: 3200,
-    },
-    {
-      id: 3,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 3",
-        level: 1,
-        rating: "4.5",
-        reviews: 234,
-      },
-      price: 1800,
-    },
-    {
-      id: 4,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 4",
-        level: 2,
-        rating: "4.7",
-        reviews: 445,
-      },
-      price: 2800,
-    },
-    {
-      id: 5,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 5",
-        level: 3,
-        rating: "5.0",
-        reviews: 1023,
-      },
-      price: 4500,
-    },
-    {
-      id: 6,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 6",
-        level: 1,
-        rating: "4.6",
-        reviews: 189,
-      },
-      price: 1500,
-    },
-    {
-      id: 7,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 7",
-        level: 2,
-        rating: "4.8",
-        reviews: 678,
-      },
-      price: 3000,
-    },
-    {
-      id: 8,
-      title: `I will create a professional ${category.toLowerCase()} design`,
-      seller: {
-        name: "Seller 8",
-        level: 3,
-        rating: "4.9",
-        reviews: 756,
-      },
-      price: 3800,
-    },
-  ]
+  const itemsPerPage = 8
+  const totalPages = Math.ceil(totalCount / itemsPerPage)
+
+  const supabase = createClient()
+
+  const fetchFreelancers = async (page: number, sort: SortOption) => {
+    setLoading(true)
+    try {
+      // First, let's get the freelancer profiles with a simpler query
+      let query = supabase.from("freelancer_profiles").select(`
+        id,
+        user_id,
+        first_name,
+        last_name,
+        display_name,
+        description,
+        occupation,
+        custom_occupation,
+        price,
+        created_at
+      `)
+
+      // Search for category in multiple fields - simplified approach
+      const searchTerm = category.toLowerCase()
+
+      // Use a simpler or condition without complex formatting
+      query = query.or(
+        `occupation.ilike.%${searchTerm}%,` +
+          `custom_occupation.ilike.%${searchTerm}%,` +
+          `description.ilike.%${searchTerm}%,` +
+          `display_name.ilike.%${searchTerm}%,` +
+          `first_name.ilike.%${searchTerm}%,` +
+          `last_name.ilike.%${searchTerm}%`,
+      )
+
+      // Apply sorting
+      switch (sort) {
+        case "price_low_high":
+          query = query.order("price", { ascending: true, nullsLast: true })
+          break
+        case "price_high_low":
+          query = query.order("price", { ascending: false, nullsFirst: true })
+          break
+        default:
+          query = query.order("created_at", { ascending: false })
+      }
+
+      // Apply pagination
+      const from = (page - 1) * itemsPerPage
+      const to = from + itemsPerPage - 1
+      query = query.range(from, to)
+
+      const { data: freelancerData, error: freelancerError } = await query
+
+      if (freelancerError) {
+        console.error("Error fetching freelancers:", freelancerError)
+        return
+      }
+
+      if (!freelancerData || freelancerData.length === 0) {
+        setFreelancers([])
+        setTotalCount(0)
+        return
+      }
+
+      // Get user data separately for the freelancers we found
+      const userIds = freelancerData.map((f) => f.user_id)
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, email, user_metadata")
+        .in("id", userIds)
+
+      if (userError) {
+        console.error("Error fetching user data:", userError)
+        // Continue without user data
+      }
+
+      // Combine freelancer and user data
+      const combinedData = freelancerData.map((freelancer) => {
+        const user = userData?.find((u) => u.id === freelancer.user_id)
+        return {
+          ...freelancer,
+          users: user
+            ? {
+                email: user.email,
+                user_metadata: user.user_metadata,
+              }
+            : undefined,
+        }
+      })
+
+      setFreelancers(combinedData)
+
+      // Get total count for pagination with a separate simpler query
+      const { count } = await supabase
+        .from("freelancer_profiles")
+        .select("*", { count: "exact", head: true })
+        .or(
+          `occupation.ilike.%${searchTerm}%,` +
+            `custom_occupation.ilike.%${searchTerm}%,` +
+            `description.ilike.%${searchTerm}%,` +
+            `display_name.ilike.%${searchTerm}%,` +
+            `first_name.ilike.%${searchTerm}%,` +
+            `last_name.ilike.%${searchTerm}%`,
+        )
+
+      setTotalCount(count || 0)
+    } catch (error) {
+      console.error("Error:", error)
+      setFreelancers([])
+      setTotalCount(0)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchFreelancers(currentPage, sortBy)
+  }, [category, currentPage, sortBy])
+
+  const handleSortChange = (newSort: SortOption) => {
+    setSortBy(newSort)
+    setCurrentPage(1) // Reset to first page when sorting changes
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const renderPagination = () => {
+    if (totalPages <= 1) return null
+
+    const pages = []
+    const maxVisiblePages = 5
+
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2))
+    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1)
+
+    if (endPage - startPage + 1 < maxVisiblePages) {
+      startPage = Math.max(1, endPage - maxVisiblePages + 1)
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(i)
+    }
+
+    return (
+      <div className="flex items-center justify-center gap-2 mt-8">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+
+        {startPage > 1 && (
+          <>
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(1)}>
+              1
+            </Button>
+            {startPage > 2 && <span className="px-2">...</span>}
+          </>
+        )}
+
+        {pages.map((page) => (
+          <Button
+            key={page}
+            variant={currentPage === page ? "default" : "outline"}
+            size="sm"
+            onClick={() => handlePageChange(page)}
+            className={currentPage === page ? "bg-[#00D37F] hover:bg-[#00c070]" : ""}
+          >
+            {page}
+          </Button>
+        ))}
+
+        {endPage < totalPages && (
+          <>
+            {endPage < totalPages - 1 && <span className="px-2">...</span>}
+            <Button variant="outline" size="sm" onClick={() => handlePageChange(totalPages)}>
+              {totalPages}
+            </Button>
+          </>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <div>
@@ -135,171 +260,111 @@ export default function CategoryPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-[#0F2830] mb-2 capitalize">{category}</h1>
-          <p className="text-gray-600">Stand out from the crowd with a design that fits your brand personality.</p>
+          <p className="text-gray-600">Find talented freelancers specializing in {category}.</p>
         </div>
 
-        {/* Service Options */}
-        <div className="grid md:grid-cols-2 gap-4 mb-8">
-          <Button
-            variant="outline"
-            className="h-auto p-6 flex items-center gap-4 hover:border-[#00D37F]"
-          >
-            <div className="h-12 w-12 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-[#0F2830] mb-1">Custom services</h3>
-              <p className="text-sm text-gray-600">Find a professional designer</p>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="h-auto p-6 flex items-center gap-4 hover:border-[#00D37F]"
-          >
-            <div className="h-12 w-12 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751]">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </div>
-            <div className="text-left">
-              <h3 className="font-semibold text-[#0F2830] mb-1">AI Designer</h3>
-              <p className="text-sm text-gray-600">Customize pre-made designs</p>
-            </div>
-          </Button>
-        </div>
-
-        {/* Style Categories */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-[#0F2830] mb-4">Select style</h2>
-          <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
-            {logoStyles.map((style) => (
-              <Button
-                key={style.id}
-                variant="outline"
-                className="flex-shrink-0 h-auto py-6 px-8 flex flex-col items-center gap-2 hover:border-[#00D37F]"
-              >
-                <span className="text-2xl">{style.icon}</span>
-                <span className="text-sm font-medium">{style.name}</span>
-              </Button>
-            ))}
+        {/* Filters and Sort */}
+        <div className="flex flex-wrap gap-4 mb-8 items-center justify-between">
+          <div className="flex flex-wrap gap-4">
+            <Button variant="outline" className="text-[#0F2830]">
+              Service options
+              <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
+            </Button>
+            <Button variant="outline" className="text-[#0F2830]">
+              Seller details
+              <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
+            </Button>
+            <Button variant="outline" className="text-[#0F2830]">
+              Budget
+              <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
+            </Button>
+            <Button variant="outline" className="text-[#0F2830]">
+              Delivery time
+              <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
+            </Button>
           </div>
-        </div>
 
-        {/* Filters */}
-        <div className="flex flex-wrap gap-4 mb-8">
-          <Button variant="outline" className="text-[#0F2830]">
-            Service options
-            <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
-          </Button>
-          <Button variant="outline" className="text-[#0F2830]">
-            Seller details
-            <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
-          </Button>
-          <Button variant="outline" className="text-[#0F2830]">
-            Budget
-            <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
-          </Button>
-          <Button variant="outline" className="text-[#0F2830]">
-            Delivery time
-            <ChevronRight className="h-4 w-4 ml-2 rotate-90" />
-          </Button>
+          <select
+            className="border rounded-md px-3 py-2 text-sm text-[#0F2830] focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
+            value={sortBy}
+            onChange={(e) => handleSortChange(e.target.value as SortOption)}
+          >
+            <option value="default">Best Match</option>
+            <option value="price_low_high">Price: Low to High</option>
+            <option value="price_high_low">Price: High to Low</option>
+          </select>
         </div>
 
         {/* Results */}
         <div className="mb-4 flex justify-between items-center">
-          <p className="text-gray-600">{gigs.length.toLocaleString()}+ services available</p>
-          <select className="border rounded-md px-3 py-2 text-sm text-[#0F2830] focus:outline-none focus:ring-2 focus:ring-[#00D37F]">
-            <option>Best selling</option>
-            <option>Newest</option>
-            <option>Price: Low to High</option>
-            <option>Price: High to Low</option>
-          </select>
+          <p className="text-gray-600">
+            {loading ? "Loading..." : `${totalCount.toLocaleString()} freelancer${totalCount !== 1 ? "s" : ""} found`}
+          </p>
+          {totalPages > 1 && (
+            <p className="text-sm text-gray-500">
+              Page {currentPage} of {totalPages}
+            </p>
+          )}
         </div>
 
-        {/* Gigs Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {gigs.map((gig) => (
-            <div key={gig.id} className="group relative rounded-lg overflow-hidden border border-gray-200 bg-white">
-              <div className="absolute top-3 right-3 z-10">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="bg-white/80 backdrop-blur-sm rounded-full h-8 w-8 text-gray-700 hover:text-[#00D37F]"
-                >
-                  <Heart className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="relative h-48 w-full">
-                <Image
-                  src={`/placeholder.svg?height=200&width=300&text=Gig${gig.id}`}
-                  alt="Gig preview"
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                />
-              </div>
-
-              <div className="p-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-8 h-8 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751] font-medium">
-                    {gig.seller.name[0]}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium">{gig.seller.name}</p>
-                    <div className="flex items-center text-xs text-gray-500">
-                      Level {gig.seller.level} <span className="mx-1">•</span> Top Rated
+        {/* Freelancers Grid */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="animate-pulse">
+                <div className="bg-gray-200 h-48 rounded-t-xl"></div>
+                <div className="p-4 bg-white rounded-b-xl border border-t-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                    <div className="flex-1">
+                      <div className="h-4 bg-gray-200 rounded mb-1"></div>
+                      <div className="h-3 bg-gray-200 rounded w-20"></div>
                     </div>
                   </div>
-                </div>
-
-                <h3 className="font-medium text-[#0F2830] mb-3 line-clamp-2">{gig.title}</h3>
-
-                <div className="flex items-center text-sm text-amber-500 mb-3">
-                  <Star className="h-4 w-4 fill-amber-500 stroke-amber-500" />
-                  <span className="ml-1 font-medium">{gig.seller.rating}</span>
-                  <span className="text-gray-400 ml-1">({gig.seller.reviews})</span>
-                </div>
-
-                <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                  <p className="text-xs text-gray-500">{t("from")}</p>
-                  <p className="font-bold text-[#0F2830]">
-                    {new Intl.NumberFormat("fr-DZ", {
-                      style: "currency",
-                      currency: "DZD",
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(gig.price)}
-                  </p>
+                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                  <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                 </div>
               </div>
+            ))}
+          </div>
+        ) : freelancers.length > 0 ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {freelancers.map((freelancer) => (
+                <FreelancerCard
+                  key={freelancer.id}
+                  freelancer={{
+                    ...freelancer,
+                    email: freelancer.users?.email,
+                    user_metadata: freelancer.users?.user_metadata,
+                  }}
+                />
+              ))}
             </div>
-          ))}
-        </div>
+            {renderPagination()}
+          </>
+        ) : (
+          <div className="text-center py-12">
+            <div className="text-gray-400 mb-4">
+              <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1}
+                  d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-600 mb-2">No freelancers found</h3>
+            <p className="text-gray-500 mb-4">
+              We couldn't find any freelancers matching "{category}". Try a different category or search term.
+            </p>
+            <Link href="/">
+              <Button className="bg-[#00D37F] hover:bg-[#00c070] text-white">Browse All Categories</Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )
