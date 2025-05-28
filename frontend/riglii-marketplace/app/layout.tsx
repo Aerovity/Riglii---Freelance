@@ -1,12 +1,10 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter } from 'next/font/google'
-import { ClerkProvider } from '@clerk/nextjs'
 import { Roboto, Roboto_Mono } from 'next/font/google'
 import "./globals.css"
 import { LanguageProvider } from "./language-provider"
-import SiteHeader from "@/components/layout/site-header"
-import SiteFooter from "@/components/layout/site-footer"
+import ConditionalLayout from "@/components/layout/conditional-layout"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -33,20 +31,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <ClerkProvider>
-      <html lang="en">
-        <body className={`${inter.className} ${roboto.variable} ${robotoMono.variable} antialiased`}>
-          <LanguageProvider>
-            <div className="flex flex-col min-h-screen">
-              <SiteHeader />
-              <main className="flex-grow relative z-10">
-                {children}
-              </main>
-              <SiteFooter />
-            </div>
-          </LanguageProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+    <html lang="en">
+      <body className={`${inter.className} ${roboto.variable} ${robotoMono.variable} antialiased`}>
+        <LanguageProvider>
+          <ConditionalLayout>
+            {children}
+          </ConditionalLayout>
+        </LanguageProvider>
+      </body>
+    </html>
   )
 }

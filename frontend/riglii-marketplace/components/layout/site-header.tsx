@@ -55,14 +55,6 @@ export default function SiteHeader() {
     return () => subscription.unsubscribe()
   }, [supabase.auth])
 
-  const handleLogin = () => {
-    window.open("/login")
-  }
-
-  const handleRegister = () => {
-    window.open("/login?mode=signup")
-  }
-
   const handleSignOut = async () => {
     await supabase.auth.signOut()
   }
@@ -175,15 +167,15 @@ export default function SiteHeader() {
                   <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">{t("getStarted")}</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem>
-                    <button onClick={handleLogin} className="flex items-center w-full text-left">
+                  <DropdownMenuItem asChild>
+                    <Link href="/login" className="flex items-center w-full">
                       {t("login")}
-                    </button>
+                    </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <button onClick={handleRegister} className="flex items-center w-full text-left">
+                  <DropdownMenuItem asChild>
+                    <Link href="/login?mode=signup" className="flex items-center w-full">
                       {t("register")}
-                    </button>
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
