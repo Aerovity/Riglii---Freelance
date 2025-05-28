@@ -8,13 +8,14 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const token_hash = searchParams.get('token_hash')
   const type = searchParams.get('type') as EmailOtpType | null
-  const next = '/account'
+  const next = '/login?verified=true' // Redirect to login with verified flag
 
   // Create redirect link without the secret token
   const redirectTo = request.nextUrl.clone()
-  redirectTo.pathname = next
+  redirectTo.pathname = next.split('?')[0]
   redirectTo.searchParams.delete('token_hash')
   redirectTo.searchParams.delete('type')
+  redirectTo.searchParams.set('verified', 'true')
 
   if (token_hash && type) {
     const supabase = await createClient()
@@ -24,7 +25,9 @@ export async function GET(request: NextRequest) {
       token_hash,
     })
     if (!error) {
-      redirectTo.searchParams.delete('next')
+      // Sign out the user after verification so they have to log in
+      await supabase.auth.signOut()
+      
       return NextResponse.redirect(redirectTo)
     }
   }
