@@ -1,12 +1,15 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Check, Upload, X, Plus, Trash2 } from "lucide-react"
+import { useToast } from "@/hooks/use-toast"
+import { checkFreelancerProfileExistsRPC } from "@/utils/supabase/freelancer"
 // import { DialogTitle } from "@/components/ui/dialog"
 
 interface FreelancerOnboardingProps {
@@ -15,13 +18,17 @@ interface FreelancerOnboardingProps {
 }
 
 export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboardingProps) {
+  const supabase = createClient()
+  const { toast } = useToast()
   const [step, setStep] = useState(1)
+  const [submitting, setSubmitting] = useState(false)
+  const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([])
   const [formData, setFormData] = useState({
     firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
     lastName: user?.user_metadata?.full_name?.split(" ")[1] || "",
     displayName: user?.user_metadata?.username || user?.email?.split("@")[0] || "",
     description: "",
-    languages: [] as { language: string; level: string }[],
+    languages: [] as { language: string; proficiency_level: string }[],
     categories: [] as string[],
     occupation: "",
     customOccupation: "",
@@ -42,7 +49,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   })
 
   // New state for form inputs
-  const [newLanguage, setNewLanguage] = useState({ language: "", level: "Basic" })
+  const [newLanguage, setNewLanguage] = useState({ language: "", proficiency_level: "Basic" })
   const [newSkill, setNewSkill] = useState({ skill: "", level: "Beginner" })
   const [newCertificate, setNewCertificate] = useState({ name: "", issuer: "", year: "" })
   const [showCustomOccupation, setShowCustomOccupation] = useState(false)
@@ -87,6 +94,21 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
 
   const proficiencyLevels = ["Basic", "Intermediate", "Fluent", "Bilingual/Native"]
   const skillLevels = ["Beginner", "Intermediate", "Advanced", "Expert"]
+
+  // Fetch categories from database on component mount
+  useEffect(() => {
+    async function fetchCategories() {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('id, name')
+        .order('name')
+
+      if (data && !error) {
+        setAvailableCategories(data)
+      }
+    }
+    fetchCategories()
+  }, [])
 
   const handleCategoryToggle = (category: string) => {
     if (formData.categories.includes(category)) {
@@ -202,6 +224,230 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
     }
   }
 
+  const handleSubmit = async () => {
+    try {
+      setSubmitting(true)
+
+      // Verify user is authenticated
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (!session || sessionError) {
+        throw new Error("User not authenticated. Please log in again.")
+      }
+      
+      console.log('Session user ID:', session.user.id)
+      console.log('Passed user ID:', user.id)
+      console.log('Are they equal?', session.user.id === user.id)
+      
+      // Use session user ID to ensure consistency
+      const userId = session.user.id
+
+      // Check if profile already exists
+      const { exists, profileId } = await checkFreelancerProfileExistsRPC(userId)
+      
+      if (exists) {
+        toast({
+          title: "Profile Already Exists",
+          description: "You already have a freelancer profile. Redirecting...",
+          variant: "default",
+        })
+        
+        // Close the form and optionally redirect to profile edit page
+        setTimeout(() => {
+          onClose()
+          // Optional: window.location.href = '/freelancer/profile'
+        }, 2000)
+        return
+      }
+
+      // 1. Upload ID card to storage if exists
+      let idCardPath = null
+      if (formData.idCard) {
+        const fileExt = formData.idCard.name.split('.').pop()
+        const fileName = `${userId}/id-card-${Date.now()}.${fileExt}`
+        
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('freelancer-documents')
+          .upload(fileName, formData.idCard)
+
+        if (uploadError) {
+          // If it's a bucket not found error, provide a helpful message
+          if (uploadError.message.includes('Bucket not found')) {
+            throw new Error('Storage bucket not configured. Please contact support.')
+          }
+          throw uploadError
+        }
+
+        // Store just the file path, not the full URL
+        idCardPath = fileName
+      }
+
+      // Debug: Check auth status
+      const { data: authDebug, error: authDebugError } = await supabase
+        .rpc('debug_auth_info')
+      
+      console.log('Auth Debug Info:', authDebug)
+      console.log('User ID from user object:', user.id)
+      
+      if (authDebugError) {
+        console.error('Auth debug error:', authDebugError)
+      }
+
+      // 2. Insert main freelancer profile
+      const { data: profileData, error: profileError } = await supabase
+        .from('freelancer_profiles')
+        .insert({
+          user_id: userId, // Use the verified session user ID
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          display_name: formData.displayName,
+          description: formData.description,
+          occupation: formData.occupation === 'Other' ? formData.customOccupation : formData.occupation,
+          custom_occupation: formData.occupation === 'Other' ? formData.customOccupation : null,
+        })
+        .select()
+        .single()
+
+      if (profileError) {
+        console.error('Profile insert error:', profileError)
+        console.error('User ID being inserted:', user.id)
+        console.error('User object:', user)
+        throw profileError
+      }
+
+      const freelancerId = profileData.id
+
+      // 3. Insert languages
+      if (formData.languages.length > 0) {
+        const { error: langError } = await supabase
+          .from('freelancer_languages')
+          .insert(
+            formData.languages.map(lang => ({
+              freelancer_id: freelancerId,
+              language: lang.language,
+              proficiency_level: lang.proficiency_level,
+            }))
+          )
+
+        if (langError) throw langError
+      }
+
+      // 4. Insert categories
+      if (formData.categories.length > 0) {
+        // First, we need to get the category IDs from the categories table
+        const { data: categoriesData, error: catFetchError } = await supabase
+          .from('categories')
+          .select('id, name')
+          .in('name', formData.categories)
+
+        if (catFetchError) throw catFetchError
+
+        if (categoriesData && categoriesData.length > 0) {
+          const { error: catError } = await supabase
+            .from('freelancer_categories')
+            .insert(
+              categoriesData.map(category => ({
+                freelancer_id: freelancerId,
+                category_id: category.id,
+              }))
+            )
+
+          if (catError) throw catError
+        }
+      }
+
+      // 5. Insert skills
+      if (formData.skills.length > 0) {
+        const { error: skillError } = await supabase
+          .from('freelancer_skills')
+          .insert(
+            formData.skills.map(skill => ({
+              freelancer_id: freelancerId,
+              skill: skill.skill,
+              level: skill.level,
+            }))
+          )
+
+        if (skillError) throw skillError
+      }
+
+      // 6. Insert education if provided
+      if (formData.education.country || formData.education.university) {
+        const { error: eduError } = await supabase
+          .from('freelancer_education')
+          .insert({
+            freelancer_id: freelancerId,
+            country: formData.education.country,
+            university: formData.education.university,
+            title: formData.education.title,
+            major: formData.education.major,
+            year: formData.education.year,
+          })
+
+        if (eduError) throw eduError
+      }
+
+      // 7. Insert certificates
+      if (formData.certificates.length > 0) {
+        const { error: certError } = await supabase
+          .from('freelancer_certificates')
+          .insert(
+            formData.certificates.map(cert => ({
+              freelancer_id: freelancerId,
+              name: cert.name,
+              issuer: cert.issuer,
+              year: cert.year,
+            }))
+          )
+
+        if (certError) throw certError
+      }
+
+      // 8. Insert ID card document reference
+      if (idCardPath) {
+        const { error: docError } = await supabase
+          .from('freelancer_documents')
+          .insert({
+            freelancer_id: freelancerId,
+            document_type: 'id_card',
+            document_url: idCardPath, // Store just the path, not full URL
+          })
+
+        if (docError) throw docError
+      }
+
+      // 9. Insert payment info
+      if (formData.ccpDetails.rib && formData.ccpDetails.name) {
+        const { error: paymentError } = await supabase
+          .from('freelancer_payment_info')
+          .insert({
+            freelancer_id: freelancerId,
+            payment_type: 'ccp',
+            account_number: formData.ccpDetails.rib,
+            account_holder_name: formData.ccpDetails.name,
+          })
+
+        if (paymentError) throw paymentError
+      }
+
+      toast({
+        title: "Success!",
+        description: "Your freelancer profile has been created successfully.",
+      })
+
+      onClose()
+    } catch (error: any) {
+      console.error("Error submitting form:", error)
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create freelancer profile. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const renderStep = () => {
     switch (step) {
       case 1:
@@ -280,7 +526,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                       {formData.languages.map((lang, index) => (
                         <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
                           <div>{lang.language}</div>
-                          <div>{lang.level}</div>
+                          <div>{lang.proficiency_level}</div>
                           <Button
                             variant="ghost"
                             size="sm"
@@ -313,8 +559,8 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                       <select
                         id="languageLevel"
                         className="w-full h-10 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#00D37F]"
-                        value={newLanguage.level}
-                        onChange={(e) => setNewLanguage({ ...newLanguage, level: e.target.value })}
+                        value={newLanguage.proficiency_level}
+                        onChange={(e) => setNewLanguage({ ...newLanguage, proficiency_level: e.target.value })}
                       >
                         {proficiencyLevels.map((level) => (
                           <option key={level} value={level}>
@@ -351,22 +597,42 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                   Your Categories <span className="text-red-500">*</span> (Choose up to 5)
                 </Label>
                 <div className="grid grid-cols-3 gap-3 mt-2">
-                  {categories.map((category) => (
-                    <Button
-                      key={category}
-                      type="button"
-                      variant={formData.categories.includes(category) ? "default" : "outline"}
-                      className={`justify-start h-auto py-3 px-4 ${
-                        formData.categories.includes(category)
-                          ? "bg-[#00D37F] text-white"
-                          : "hover:border-[#00D37F] hover:text-[#00D37F]"
-                      }`}
-                      onClick={() => handleCategoryToggle(category)}
-                    >
-                      {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
-                      <span className="text-sm">{category}</span>
-                    </Button>
-                  ))}
+                  {availableCategories.length > 0 ? (
+                    availableCategories.map((category) => (
+                      <Button
+                        key={category.id}
+                        type="button"
+                        variant={formData.categories.includes(category.name) ? "default" : "outline"}
+                        className={`justify-start h-auto py-3 px-4 ${
+                          formData.categories.includes(category.name)
+                            ? "bg-[#00D37F] text-white"
+                            : "hover:border-[#00D37F] hover:text-[#00D37F]"
+                        }`}
+                        onClick={() => handleCategoryToggle(category.name)}
+                      >
+                        {formData.categories.includes(category.name) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
+                        <span className="text-sm">{category.name}</span>
+                      </Button>
+                    ))
+                  ) : (
+                    // Fallback to hardcoded categories if database fetch fails
+                    categories.map((category) => (
+                      <Button
+                        key={category}
+                        type="button"
+                        variant={formData.categories.includes(category) ? "default" : "outline"}
+                        className={`justify-start h-auto py-3 px-4 ${
+                          formData.categories.includes(category)
+                            ? "bg-[#00D37F] text-white"
+                            : "hover:border-[#00D37F] hover:text-[#00D37F]"
+                        }`}
+                        onClick={() => handleCategoryToggle(category)}
+                      >
+                        {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
+                        <span className="text-sm">{category}</span>
+                      </Button>
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -618,22 +884,6 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
     }
   }
 
-  const handleSubmit = async () => {
-    try {
-      // Here you would typically send the data to your backend
-      console.log("Form submitted:", formData)
-
-      // You could add API call here to save the freelancer profile
-      // await saveFreelancerProfile(formData)
-
-      onClose()
-      // You might want to show a success message or redirect
-    } catch (error) {
-      console.error("Error submitting form:", error)
-      // Handle error (show error message to user)
-    }
-  }
-
   const isStepValid = () => {
     switch (step) {
       case 1:
@@ -711,10 +961,10 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
               handleSubmit()
             }
           }}
-          disabled={!isStepValid()}
+          disabled={!isStepValid() || submitting}
           className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {step < 3 ? "Continue" : "Submit"}
+          {submitting ? "Submitting..." : step < 3 ? "Continue" : "Submit"}
         </Button>
       </div>
     </div>
