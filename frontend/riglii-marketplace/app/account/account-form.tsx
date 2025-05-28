@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import type { User } from "@supabase/supabase-js"
-import Avatar from "./avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -87,27 +86,13 @@ export default function AccountForm({ user }: { user: User | null }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
+    <div className="max-w-2xl mx-auto">
       <Card>
         <CardHeader className="text-center">
           <CardTitle>Account Settings</CardTitle>
           <CardDescription>Manage your profile information and account settings</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex justify-center">
-            <Avatar
-              uid={user?.id ?? null}
-              url={avatar_url}
-              size={150}
-              onUpload={(url) => {
-                setAvatarUrl(url)
-                updateProfile({ fullname, username, website, avatar_url: url })
-              }}
-            />
-          </div>
-
-          <Separator />
-
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>

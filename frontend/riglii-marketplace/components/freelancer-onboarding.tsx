@@ -1,25 +1,25 @@
 "use client"
 
+import type React from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Check, Upload, X, Plus, Trash2 } from 'lucide-react'
-import { DialogTitle } from "@/components/ui/dialog"
-import { useUser } from "@clerk/nextjs"
+import { Check, Upload, X, Plus, Trash2 } from "lucide-react"
+// import { DialogTitle } from "@/components/ui/dialog"
 
 interface FreelancerOnboardingProps {
   onClose: () => void
+  user?: any
 }
 
-export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingProps) {
-  const { user } = useUser()
+export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboardingProps) {
   const [step, setStep] = useState(1)
   const [formData, setFormData] = useState({
-    firstName: user?.firstName || "",
-    lastName: user?.lastName || "",
-    displayName: user?.username || "",
+    firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
+    lastName: user?.user_metadata?.full_name?.split(" ")[1] || "",
+    displayName: user?.user_metadata?.username || user?.email?.split("@")[0] || "",
     description: "",
     languages: [] as { language: string; level: string }[],
     categories: [] as string[],
@@ -82,22 +82,11 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     "Virtual Assistant",
     "Accountant",
     "Legal Consultant",
-    "Other"
+    "Other",
   ]
 
-  const proficiencyLevels = [
-    "Basic",
-    "Intermediate",
-    "Fluent",
-    "Bilingual/Native"
-  ]
-
-  const skillLevels = [
-    "Beginner",
-    "Intermediate",
-    "Advanced",
-    "Expert"
-  ]
+  const proficiencyLevels = ["Basic", "Intermediate", "Fluent", "Bilingual/Native"]
+  const skillLevels = ["Beginner", "Intermediate", "Advanced", "Expert"]
 
   const handleCategoryToggle = (category: string) => {
     if (formData.categories.includes(category)) {
@@ -115,7 +104,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     }
   }
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: 'idCard') => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: "idCard") => {
     if (e.target.files && e.target.files[0]) {
       setFormData({
         ...formData,
@@ -131,7 +120,11 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     })
   }
 
-  const handleNestedInputChange = (e: React.ChangeEvent<HTMLInputElement>, parent: keyof typeof formData, field: string) => {
+  const handleNestedInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    parent: keyof typeof formData,
+    field: string,
+  ) => {
     setFormData({
       ...formData,
       [parent]: {
@@ -145,7 +138,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     if (newLanguage.language.trim() !== "") {
       setFormData({
         ...formData,
-        languages: [...formData.languages, { ...newLanguage }]
+        languages: [...formData.languages, { ...newLanguage }],
       })
       setNewLanguage({ language: "", level: "Basic" })
     }
@@ -154,7 +147,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
   const removeLanguage = (index: number) => {
     setFormData({
       ...formData,
-      languages: formData.languages.filter((_, i) => i !== index)
+      languages: formData.languages.filter((_, i) => i !== index),
     })
   }
 
@@ -162,7 +155,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     if (newSkill.skill.trim() !== "") {
       setFormData({
         ...formData,
-        skills: [...formData.skills, { ...newSkill }]
+        skills: [...formData.skills, { ...newSkill }],
       })
       setNewSkill({ skill: "", level: "Beginner" })
     }
@@ -171,7 +164,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
   const removeSkill = (index: number) => {
     setFormData({
       ...formData,
-      skills: formData.skills.filter((_, i) => i !== index)
+      skills: formData.skills.filter((_, i) => i !== index),
     })
   }
 
@@ -179,7 +172,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     if (newCertificate.name.trim() !== "" && newCertificate.issuer.trim() !== "") {
       setFormData({
         ...formData,
-        certificates: [...formData.certificates, { ...newCertificate }]
+        certificates: [...formData.certificates, { ...newCertificate }],
       })
       setNewCertificate({ name: "", issuer: "", year: "" })
     }
@@ -188,7 +181,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
   const removeCertificate = (index: number) => {
     setFormData({
       ...formData,
-      certificates: formData.certificates.filter((_, i) => i !== index)
+      certificates: formData.certificates.filter((_, i) => i !== index),
     })
   }
 
@@ -198,13 +191,13 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
       setShowCustomOccupation(true)
       setFormData({
         ...formData,
-        occupation: "Other"
+        occupation: "Other",
       })
     } else {
       setShowCustomOccupation(false)
       setFormData({
         ...formData,
-        occupation: value
+        occupation: value,
       })
     }
   }
@@ -214,9 +207,10 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
       case 1:
         return (
           <div className="p-6">
-            <DialogTitle className="text-2xl font-bold mb-6">Personal Info</DialogTitle>
+            <h2 className="text-2xl font-bold mb-6">Personal Info</h2>
             <p className="text-gray-600 mb-6">
-              Tell us a bit about yourself. This information will appear on your public profile, so that potential buyers can get to know you better.
+              Tell us a bit about yourself. This information will appear on your public profile, so that potential
+              buyers can get to know you better.
             </p>
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
@@ -268,9 +262,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                   onChange={(e) => handleInputChange(e, "description")}
                   required
                 />
-                <div className="text-right text-sm text-gray-500 mt-1">
-                  {formData.description.length} / 600
-                </div>
+                <div className="text-right text-sm text-gray-500 mt-1">{formData.description.length} / 600</div>
               </div>
 
               <div>
@@ -289,9 +281,9 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                         <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
                           <div>{lang.language}</div>
                           <div>{lang.level}</div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => removeLanguage(index)}
                             className="text-red-500 hover:text-red-700"
                           >
@@ -301,7 +293,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                       ))}
                     </div>
                   )}
-                  
+
                   <div className="flex gap-2 items-end">
                     <div className="flex-1">
                       <Label htmlFor="language" className="block mb-2 text-sm">
@@ -325,12 +317,14 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                         onChange={(e) => setNewLanguage({ ...newLanguage, level: e.target.value })}
                       >
                         {proficiencyLevels.map((level) => (
-                          <option key={level} value={level}>{level}</option>
+                          <option key={level} value={level}>
+                            {level}
+                          </option>
                         ))}
                       </select>
                     </div>
-                    <Button 
-                      onClick={addLanguage} 
+                    <Button
+                      onClick={addLanguage}
                       disabled={!newLanguage.language.trim()}
                       className="bg-[#00D37F] hover:bg-[#00c070] text-white"
                     >
@@ -346,9 +340,10 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
       case 2:
         return (
           <div className="p-6">
-            <DialogTitle className="text-2xl font-bold mb-6">Professional Info</DialogTitle>
+            <h2 className="text-2xl font-bold mb-6">Professional Info</h2>
             <p className="text-gray-600 mb-6">
-              This is your time to shine. Let potential buyers know what you do best and how you gained your skills, certifications and experience.
+              This is your time to shine. Let potential buyers know what you do best and how you gained your skills,
+              certifications and experience.
             </p>
             <div className="space-y-6">
               <div>
@@ -362,15 +357,13 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                       type="button"
                       variant={formData.categories.includes(category) ? "default" : "outline"}
                       className={`justify-start h-auto py-3 px-4 ${
-                        formData.categories.includes(category) 
-                          ? "bg-[#00D37F] text-white" 
+                        formData.categories.includes(category)
+                          ? "bg-[#00D37F] text-white"
                           : "hover:border-[#00D37F] hover:text-[#00D37F]"
                       }`}
                       onClick={() => handleCategoryToggle(category)}
                     >
-                      {formData.categories.includes(category) && (
-                        <Check className="h-4 w-4 mr-2 flex-shrink-0" />
-                      )}
+                      {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
                       <span className="text-sm">{category}</span>
                     </Button>
                   ))}
@@ -388,13 +381,17 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                     value={formData.occupation}
                     onChange={handleOccupationChange}
                   >
-                    <option value="" disabled>Select Occupation</option>
+                    <option value="" disabled>
+                      Select Occupation
+                    </option>
                     {occupations.map((occupation) => (
-                      <option key={occupation} value={occupation}>{occupation}</option>
+                      <option key={occupation} value={occupation}>
+                        {occupation}
+                      </option>
                     ))}
                   </select>
                 </div>
-                
+
                 {showCustomOccupation && (
                   <div className="mt-3">
                     <Label htmlFor="customOccupation" className="block mb-2 text-sm">
@@ -414,7 +411,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                 <Label className="block mb-2">
                   Skills <span className="text-red-500">*</span>
                 </Label>
-                
+
                 {formData.skills.length > 0 && (
                   <div className="mb-4 border rounded-md p-3">
                     {formData.skills.map((skill, index) => (
@@ -422,9 +419,9 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                         <div className="font-medium">{skill.skill}</div>
                         <div className="flex items-center">
                           <span className="text-sm text-gray-600 mr-3">{skill.level}</span>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={() => removeSkill(index)}
                             className="text-red-500 hover:text-red-700"
                           >
@@ -435,7 +432,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                     ))}
                   </div>
                 )}
-                
+
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Input
@@ -451,12 +448,14 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                       onChange={(e) => setNewSkill({ ...newSkill, level: e.target.value })}
                     >
                       {skillLevels.map((level) => (
-                        <option key={level} value={level}>{level}</option>
+                        <option key={level} value={level}>
+                          {level}
+                        </option>
                       ))}
                     </select>
                   </div>
-                  <Button 
-                    onClick={addSkill} 
+                  <Button
+                    onClick={addSkill}
                     disabled={!newSkill.skill.trim()}
                     className="bg-[#00D37F] hover:bg-[#00c070] text-white"
                   >
@@ -466,10 +465,8 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               </div>
 
               <div>
-                <Label className="block mb-2">
-                  Certifications
-                </Label>
-                
+                <Label className="block mb-2">Certifications</Label>
+
                 {formData.certificates.length > 0 && (
                   <div className="mb-4 border rounded-md p-3">
                     {formData.certificates.map((cert, index) => (
@@ -480,9 +477,9 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                             {cert.issuer} {cert.year && `• ${cert.year}`}
                           </div>
                         </div>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
+                        <Button
+                          variant="ghost"
+                          size="sm"
                           onClick={() => removeCertificate(index)}
                           className="text-red-500 hover:text-red-700"
                         >
@@ -492,7 +489,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                     ))}
                   </div>
                 )}
-                
+
                 <div className="grid grid-cols-3 gap-2 mb-2">
                   <Input
                     placeholder="Certificate Name"
@@ -510,9 +507,9 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                     onChange={(e) => setNewCertificate({ ...newCertificate, year: e.target.value })}
                   />
                 </div>
-                <Button 
+                <Button
                   variant="outline"
-                  onClick={addCertificate} 
+                  onClick={addCertificate}
                   disabled={!newCertificate.name.trim() || !newCertificate.issuer.trim()}
                   className="w-full text-[#00D37F] border-[#00D37F]"
                 >
@@ -526,7 +523,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
       case 3:
         return (
           <div className="p-6">
-            <DialogTitle className="text-2xl font-bold mb-6">Account Security</DialogTitle>
+            <h2 className="text-2xl font-bold mb-6">Account Security</h2>
             <p className="text-gray-600 mb-6">
               To ensure the security of your account and facilitate payments, please provide the following information.
             </p>
@@ -544,9 +541,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                         </div>
                         <div className="text-left">
                           <p className="font-medium">{formData.idCard.name}</p>
-                          <p className="text-sm text-gray-500">
-                            {(formData.idCard.size / 1024 / 1024).toFixed(2)} MB
-                          </p>
+                          <p className="text-sm text-gray-500">{(formData.idCard.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
                       </div>
                       <Button
@@ -561,9 +556,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                   ) : (
                     <div>
                       <Upload className="h-10 w-10 mx-auto mb-2 text-gray-400" />
-                      <p className="text-sm text-gray-500 mb-2">
-                        Drag and drop your ID card image, or click to browse
-                      </p>
+                      <p className="text-sm text-gray-500 mb-2">Drag and drop your ID card image, or click to browse</p>
                       <Button variant="outline" className="mx-auto" asChild>
                         <label>
                           Browse Files
@@ -571,7 +564,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                             type="file"
                             className="hidden"
                             accept="image/*"
-                            onChange={(e) => handleFileChange(e, 'idCard')}
+                            onChange={(e) => handleFileChange(e, "idCard")}
                           />
                         </label>
                       </Button>
@@ -579,7 +572,8 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
                   )}
                 </div>
                 <p className="text-xs text-gray-500 mt-2">
-                  Please upload a clear photo of your Algerian ID card. This information is kept secure and is only used for verification purposes.
+                  Please upload a clear photo of your Algerian ID card. This information is kept secure and is only used
+                  for verification purposes.
                 </p>
               </div>
 
@@ -624,11 +618,41 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
     }
   }
 
-  const handleSubmit = () => {
-    // Here you would typically send the data to your backend
-    console.log("Form submitted:", formData)
-    onClose()
-    // You might want to show a success message or redirect
+  const handleSubmit = async () => {
+    try {
+      // Here you would typically send the data to your backend
+      console.log("Form submitted:", formData)
+
+      // You could add API call here to save the freelancer profile
+      // await saveFreelancerProfile(formData)
+
+      onClose()
+      // You might want to show a success message or redirect
+    } catch (error) {
+      console.error("Error submitting form:", error)
+      // Handle error (show error message to user)
+    }
+  }
+
+  const isStepValid = () => {
+    switch (step) {
+      case 1:
+        return (
+          formData.firstName.trim() !== "" &&
+          formData.lastName.trim() !== "" &&
+          formData.displayName.trim() !== "" &&
+          formData.description.trim() !== "" &&
+          formData.languages.length > 0
+        )
+      case 2:
+        return formData.categories.length > 0 && formData.occupation !== "" && formData.skills.length > 0
+      case 3:
+        return (
+          formData.idCard !== null && formData.ccpDetails.rib.trim() !== "" && formData.ccpDetails.name.trim() !== ""
+        )
+      default:
+        return false
+    }
   }
 
   return (
@@ -645,10 +669,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               1
             </div>
             <div className="h-1 w-12 bg-gray-200">
-              <div
-                className="h-full bg-[#00D37F]"
-                style={{ width: step > 1 ? "100%" : "0%" }}
-              ></div>
+              <div className="h-full bg-[#00D37F]" style={{ width: step > 1 ? "100%" : "0%" }}></div>
             </div>
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -658,10 +679,7 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               2
             </div>
             <div className="h-1 w-12 bg-gray-200">
-              <div
-                className="h-full bg-[#00D37F]"
-                style={{ width: step > 2 ? "100%" : "0%" }}
-              ></div>
+              <div className="h-full bg-[#00D37F]" style={{ width: step > 2 ? "100%" : "0%" }}></div>
             </div>
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center ${
@@ -671,28 +689,18 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               3
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700"
-          >
+          <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* Form content */}
-      <div className="flex-1 overflow-y-auto">
-        {renderStep()}
-      </div>
+      <div className="flex-1 overflow-y-auto">{renderStep()}</div>
 
       {/* Footer with navigation buttons */}
       <div className="bg-gray-50 px-6 py-4 border-t flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => (step > 1 ? setStep(step - 1) : onClose())}
-        >
+        <Button variant="outline" onClick={() => (step > 1 ? setStep(step - 1) : onClose())}>
           {step > 1 ? "Back" : "Cancel"}
         </Button>
         <Button
@@ -703,7 +711,8 @@ export default function FreelancerOnboarding({ onClose }: FreelancerOnboardingPr
               handleSubmit()
             }
           }}
-          className="bg-[#00D37F] hover:bg-[#00c070] text-white"
+          disabled={!isStepValid()}
+          className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {step < 3 ? "Continue" : "Submit"}
         </Button>

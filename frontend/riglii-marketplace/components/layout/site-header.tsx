@@ -2,9 +2,12 @@
 
 import Link from "next/link"
 import Image from "next/image"
-import { Search, Heart, ArrowRight, BriefcaseBusiness, User } from 'lucide-react'
+import { Search, UserIcon, Settings, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { useEffect, useState } from "react"
+import { createClient } from "@/utils/supabase/client"
+import type { User } from "@supabase/supabase-js"
 import LanguageSelector from "@/components/language-selector"
 import { useLanguage } from "@/app/language-provider"
 import NotificationsDropdown from "@/components/notifications-dropdown"
@@ -14,27 +17,66 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import FreelancerOnboarding from "@/components/freelancer-onboarding"
 
 export default function SiteHeader() {
   const { t, language } = useLanguage()
   const isRtl = language === "ar"
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
-  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    // Get initial user
+    const getUser = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      setUser(user)
+      setLoading(false)
+    }
+
+    getUser()
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase.auth])
 
   const handleLogin = () => {
-    // Open sign-in page in a new tab
-    window.open('/login')
+    window.open("/login")
   }
 
   const handleRegister = () => {
-    // Open sign-in page in sign-up mode in a new tab
-    window.open('/login?mode=signup')
+    window.open("/login?mode=signup")
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+  }
+
+  const getUserInitials = (user: User) => {
+    const fullName = user.user_metadata?.full_name || user.email
+    if (fullName) {
+      const names = fullName.split(" ")
+      if (names.length >= 2) {
+        return `${names[0][0]}${names[1][0]}`.toUpperCase()
+      }
+      return fullName.slice(0, 2).toUpperCase()
+    }
+    return "U"
   }
 
   return (
@@ -44,19 +86,14 @@ export default function SiteHeader() {
         <div className="container mx-auto px-4 flex items-center justify-between h-16">
           <div className="flex items-center gap-6 flex-1">
             <Link href="/" className="flex items-center shrink-0">
-              <Image
-                src="/Riglii_logo.png"
-                alt="Riglii Logo"
-                width={360}
-                height={120}
-                className="h-20 w-auto"
-              />
+              <Image src="/Riglii_logo.png" alt="Riglii Logo" width={360} height={120} className="h-20 w-auto" />
             </Link>
             <div className="relative flex items-center flex-1 max-w-xl">
               <Input
                 type="text"
                 placeholder={t("search")}
                 className="pr-10 border-gray-300 focus:border-[#00D37F] focus:ring-[#00D37F]"
+                dir={isRtl ? "rtl" : "ltr"}
               />
               <Button
                 size="icon"
@@ -76,33 +113,81 @@ export default function SiteHeader() {
               {t("business")}
             </Link>
             <LanguageSelector />
-            <div className="flex items-center gap-2">
+
+            {/* Show notifications and messages when user is logged in */}
+            {user && (
+              <>
+                <NotificationsDropdown />
+                <MessagesDropdown />
+              </>
+            )}
+
+            {loading ? (
+              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
+            ) : user ? (
+              // Show user profile when logged in
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">
-                    Get Started
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={user.user_metadata?.avatar_url || "/placeholder.svg"} alt="Profile" />
+                      <AvatarFallback className="bg-[#00D37F] text-white text-sm font-medium">
+                        {getUserInitials(user)}
+                      </AvatarFallback>
+                    </Avatar>
                   </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      <p className="font-medium">{user.user_metadata?.full_name || "User"}</p>
+                      <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/account" className="flex items-center">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>{t("dashboard")}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/account" className="flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>{t("settings")}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setShowOnboarding(true)} className="flex items-center">
+                    <span>{t("becomeFreelancer")}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>{t("signOut")}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              // Show Get Started button when not logged in
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">{t("getStarted")}</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem>
-                    <button 
-                      onClick={handleLogin} 
-                      className="flex items-center w-full text-left"
-                    >
-                      Login
+                    <button onClick={handleLogin} className="flex items-center w-full text-left">
+                      {t("login")}
                     </button>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
-                    <button 
-                      onClick={handleRegister} 
-                      className="flex items-center w-full text-left"
-                    >
-                      Register
+                    <button onClick={handleRegister} className="flex items-center w-full text-left">
+                      {t("register")}
                     </button>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </div>
+            )}
           </nav>
 
           <Button variant="outline" size="icon" className="md:hidden">
@@ -132,6 +217,14 @@ export default function SiteHeader() {
           <CategoriesDropdown />
         </div>
       </div>
+
+      {/* Freelancer Onboarding Dialog */}
+      <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogTitle className="sr-only">Freelancer Onboarding</DialogTitle>
+          <FreelancerOnboarding onClose={() => setShowOnboarding(false)} />
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
