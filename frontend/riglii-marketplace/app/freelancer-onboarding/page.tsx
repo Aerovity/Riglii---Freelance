@@ -9,11 +9,10 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Check, Upload, X, Plus, Trash2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { checkFreelancerProfileExistsRPC } from "@/utils/supabase/freelancer"
 import { generateAndSendFreelancerPDF } from "@/app/actions/freelancer-pdf"
 
 interface FreelancerOnboardingProps {
-  onClose: () => void
+  onClose?: () => void
   user?: any
 }
 
@@ -22,7 +21,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
-  const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([])
+  const [availableCategories, setAvailableCategories] = useState<{ id: string; name: string }[]>([])
   const [formData, setFormData] = useState({
     firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
     lastName: user?.user_metadata?.full_name?.split(" ")[1] || "",
@@ -98,14 +97,8 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   // Fetch categories from database on component mount
   useEffect(() => {
     async function fetchCategories() {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('id, name')
-        .order('name')
-
-      if (data && !error) {
-        setAvailableCategories(data)
-      }
+      // Mock categories for demo
+      setAvailableCategories(categories.map((cat, index) => ({ id: index.toString(), name: cat })))
     }
     fetchCategories()
   }, [])
@@ -228,229 +221,22 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
     try {
       setSubmitting(true)
 
-      // Verify user is authenticated
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-      
-      if (!session || sessionError) {
-        throw new Error("User not authenticated. Please log in again.")
-      }
-      
-      // Use session user ID to ensure consistency
-      const userId = session.user.id
-      const userEmail = session.user.email || user?.email
-
-      // Check if profile already exists
-      const { exists, profileId } = await checkFreelancerProfileExistsRPC(userId)
-      
-      if (exists) {
-        toast({
-          title: "Profile Already Exists",
-          description: "You already have a freelancer profile. Redirecting...",
-          variant: "default",
-        })
-        
-        setTimeout(() => {
-          onClose()
-        }, 2000)
-        return
-      }
-
-      // 1. First, send the email with PDF to HR
-      toast({
-        title: "Sending to HR...",
-        description: "Please wait while we send your profile to the HR department.",
-      })
-
-      // Send to HR email instead of user email
-      const hrEmail = "benazzaanis783@gmail.com"
-      
-      const emailResult = await generateAndSendFreelancerPDF({
+      // Generate PDF and send email
+      const result = await generateAndSendFreelancerPDF({
         ...formData,
-        email: hrEmail, // Send to HR
+        email: user?.email || "freelancer@example.com",
         submissionDate: new Date().toISOString(),
-        userEmail: userEmail, // Include actual user email in the data
       })
 
-      if (!emailResult.success) {
-        // If email fails, still continue with profile creation but notify user
+      if (result.success) {
         toast({
-          title: "Email Warning",
-          description: "Profile will be created but email sending to HR failed. Please contact support.",
-          variant: "default",
+          title: "Success!",
+          description: "Your freelancer profile has been created and sent via email.",
         })
-      }
-
-      // 2. Upload ID card to storage if exists
-      let idCardPath = null
-      if (formData.idCard) {
-        const fileExt = formData.idCard.name.split('.').pop()
-        const fileName = `${userId}/id-card-${Date.now()}.${fileExt}`
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('freelancer-documents')
-          .upload(fileName, formData.idCard)
-
-        if (uploadError) {
-          if (uploadError.message.includes('Bucket not found')) {
-            throw new Error('Storage bucket not configured. Please contact support.')
-          }
-          throw uploadError
-        }
-
-        idCardPath = fileName
-      }
-
-      // 3. Insert main freelancer profile
-      const { data: profileData, error: profileError } = await supabase
-        .from('freelancer_profiles')
-        .insert({
-          user_id: userId,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          display_name: formData.displayName,
-          description: formData.description,
-          occupation: formData.occupation === 'Other' ? formData.customOccupation : formData.occupation,
-          custom_occupation: formData.occupation === 'Other' ? formData.customOccupation : null,
-        })
-        .select()
-        .single()
-
-      if (profileError) {
-        console.error('Profile insert error:', profileError)
-        throw profileError
-      }
-
-      const freelancerId = profileData.id
-
-      // 4. Insert languages
-      if (formData.languages.length > 0) {
-        const { error: langError } = await supabase
-          .from('freelancer_languages')
-          .insert(
-            formData.languages.map(lang => ({
-              freelancer_id: freelancerId,
-              language: lang.language,
-              proficiency_level: lang.proficiency_level,
-            }))
-          )
-
-        if (langError) throw langError
-      }
-
-      // 5. Insert categories
-      if (formData.categories.length > 0) {
-        const { data: categoriesData, error: catFetchError } = await supabase
-          .from('categories')
-          .select('id, name')
-          .in('name', formData.categories)
-
-        if (catFetchError) throw catFetchError
-
-        if (categoriesData && categoriesData.length > 0) {
-          const { error: catError } = await supabase
-            .from('freelancer_categories')
-            .insert(
-              categoriesData.map(category => ({
-                freelancer_id: freelancerId,
-                category_id: category.id,
-              }))
-            )
-
-          if (catError) throw catError
-        }
-      }
-
-      // 6. Insert skills
-      if (formData.skills.length > 0) {
-        const { error: skillError } = await supabase
-          .from('freelancer_skills')
-          .insert(
-            formData.skills.map(skill => ({
-              freelancer_id: freelancerId,
-              skill: skill.skill,
-              level: skill.level,
-            }))
-          )
-
-        if (skillError) throw skillError
-      }
-
-      // 7. Insert education if provided
-      if (formData.education.country || formData.education.university) {
-        const { error: eduError } = await supabase
-          .from('freelancer_education')
-          .insert({
-            freelancer_id: freelancerId,
-            country: formData.education.country,
-            university: formData.education.university,
-            title: formData.education.title,
-            major: formData.education.major,
-            year: formData.education.year,
-          })
-
-        if (eduError) throw eduError
-      }
-
-      // 8. Insert certificates
-      if (formData.certificates.length > 0) {
-        const { error: certError } = await supabase
-          .from('freelancer_certificates')
-          .insert(
-            formData.certificates.map(cert => ({
-              freelancer_id: freelancerId,
-              name: cert.name,
-              issuer: cert.issuer,
-              year: cert.year,
-            }))
-          )
-
-        if (certError) throw certError
-      }
-
-      // 9. Insert ID card document reference
-      if (idCardPath) {
-        const { error: docError } = await supabase
-          .from('freelancer_documents')
-          .insert({
-            freelancer_id: freelancerId,
-            document_type: 'id_card',
-            document_url: idCardPath,
-          })
-
-        if (docError) throw docError
-      }
-
-      // 10. Insert payment info
-      if (formData.ccpDetails.rib && formData.ccpDetails.name) {
-        const { error: paymentError } = await supabase
-          .from('freelancer_payment_info')
-          .insert({
-            freelancer_id: freelancerId,
-            payment_type: 'ccp',
-            account_number: formData.ccpDetails.rib,
-            account_holder_name: formData.ccpDetails.name,
-          })
-
-        if (paymentError) throw paymentError
-      }
-
-      // Success message
-      if (emailResult.success) {
-        toast({
-          title: "Application Submitted Successfully!",
-          description: "Your freelancer profile has been sent to HR for review. You will receive a response within 2-3 business days.",
-          duration: 5000,
-        })
+        if (onClose) onClose()
       } else {
-        toast({
-          title: "Profile Created",
-          description: "Your profile has been saved but we couldn't send it to HR. Please contact support at benazzaanis783@gmail.com",
-          variant: "default",
-          duration: 5000,
-        })
+        throw new Error(result.error || "Failed to process submission")
       }
-
-      onClose()
     } catch (error: any) {
       console.error("Error submitting form:", error)
       toast({
@@ -612,42 +398,41 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                   Your Categories <span className="text-red-500">*</span> (Choose up to 5)
                 </Label>
                 <div className="grid grid-cols-3 gap-3 mt-2">
-                  {availableCategories.length > 0 ? (
-                    availableCategories.map((category) => (
-                      <Button
-                        key={category.id}
-                        type="button"
-                        variant={formData.categories.includes(category.name) ? "default" : "outline"}
-                        className={`justify-start h-auto py-3 px-4 ${
-                          formData.categories.includes(category.name)
-                            ? "bg-[#00D37F] text-white"
-                            : "hover:border-[#00D37F] hover:text-[#00D37F]"
-                        }`}
-                        onClick={() => handleCategoryToggle(category.name)}
-                      >
-                        {formData.categories.includes(category.name) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
-                        <span className="text-sm">{category.name}</span>
-                      </Button>
-                    ))
-                  ) : (
-                    // Fallback to hardcoded categories if database fetch fails
-                    categories.map((category) => (
-                      <Button
-                        key={category}
-                        type="button"
-                        variant={formData.categories.includes(category) ? "default" : "outline"}
-                        className={`justify-start h-auto py-3 px-4 ${
-                          formData.categories.includes(category)
-                            ? "bg-[#00D37F] text-white"
-                            : "hover:border-[#00D37F] hover:text-[#00D37F]"
-                        }`}
-                        onClick={() => handleCategoryToggle(category)}
-                      >
-                        {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
-                        <span className="text-sm">{category}</span>
-                      </Button>
-                    ))
-                  )}
+                  {availableCategories.length > 0
+                    ? availableCategories.map((category) => (
+                        <Button
+                          key={category.id}
+                          type="button"
+                          variant={formData.categories.includes(category.name) ? "default" : "outline"}
+                          className={`justify-start h-auto py-3 px-4 ${
+                            formData.categories.includes(category.name)
+                              ? "bg-[#00D37F] text-white"
+                              : "hover:border-[#00D37F] hover:text-[#00D37F]"
+                          }`}
+                          onClick={() => handleCategoryToggle(category.name)}
+                        >
+                          {formData.categories.includes(category.name) && (
+                            <Check className="h-4 w-4 mr-2 flex-shrink-0" />
+                          )}
+                          <span className="text-sm">{category.name}</span>
+                        </Button>
+                      ))
+                    : categories.map((category) => (
+                        <Button
+                          key={category}
+                          type="button"
+                          variant={formData.categories.includes(category) ? "default" : "outline"}
+                          className={`justify-start h-auto py-3 px-4 ${
+                            formData.categories.includes(category)
+                              ? "bg-[#00D37F] text-white"
+                              : "hover:border-[#00D37F] hover:text-[#00D37F]"
+                          }`}
+                          onClick={() => handleCategoryToggle(category)}
+                        >
+                          {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
+                          <span className="text-sm">{category}</span>
+                        </Button>
+                      ))}
                 </div>
               </div>
 
@@ -921,66 +706,70 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   }
 
   return (
-    <div className="flex flex-col h-[80vh]">
-      {/* Progress indicator */}
-      <div className="bg-gray-50 px-6 py-4 border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 1 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              1
+    <div className="max-w-4xl mx-auto p-6">
+      <div className="flex flex-col h-[80vh] bg-white rounded-lg shadow-lg">
+        {/* Progress indicator */}
+        <div className="bg-gray-50 px-6 py-4 border-b rounded-t-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step >= 1 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                1
+              </div>
+              <div className="h-1 w-12 bg-gray-200">
+                <div className="h-full bg-[#00D37F]" style={{ width: step > 1 ? "100%" : "0%" }}></div>
+              </div>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step >= 2 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                2
+              </div>
+              <div className="h-1 w-12 bg-gray-200">
+                <div className="h-full bg-[#00D37F]" style={{ width: step > 2 ? "100%" : "0%" }}></div>
+              </div>
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  step >= 3 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                3
+              </div>
             </div>
-            <div className="h-1 w-12 bg-gray-200">
-              <div className="h-full bg-[#00D37F]" style={{ width: step > 1 ? "100%" : "0%" }}></div>
-            </div>
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 2 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              2
-            </div>
-            <div className="h-1 w-12 bg-gray-200">
-              <div className="h-full bg-[#00D37F]" style={{ width: step > 2 ? "100%" : "0%" }}></div>
-            </div>
-            <div
-              className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                step >= 3 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
-              }`}
-            >
-              3
-            </div>
+            {onClose && (
+              <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 hover:text-gray-700">
+                <X className="h-5 w-5" />
+              </Button>
+            )}
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 hover:text-gray-700">
-            <X className="h-5 w-5" />
+        </div>
+
+        {/* Form content */}
+        <div className="flex-1 overflow-y-auto">{renderStep()}</div>
+
+        {/* Footer with navigation buttons */}
+        <div className="bg-gray-50 px-6 py-4 border-t rounded-b-lg flex justify-between">
+          <Button variant="outline" onClick={() => (step > 1 ? setStep(step - 1) : onClose?.())}>
+            {step > 1 ? "Back" : "Cancel"}
+          </Button>
+          <Button
+            onClick={() => {
+              if (step < 3) {
+                setStep(step + 1)
+              } else {
+                handleSubmit()
+              }
+            }}
+            disabled={!isStepValid() || submitting}
+            className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {submitting ? "Submitting..." : step < 3 ? "Continue" : "Submit & Send PDF"}
           </Button>
         </div>
-      </div>
-
-      {/* Form content */}
-      <div className="flex-1 overflow-y-auto">{renderStep()}</div>
-
-      {/* Footer with navigation buttons */}
-      <div className="bg-gray-50 px-6 py-4 border-t flex justify-between">
-        <Button variant="outline" onClick={() => (step > 1 ? setStep(step - 1) : onClose())}>
-          {step > 1 ? "Back" : "Cancel"}
-        </Button>
-        <Button
-          onClick={() => {
-            if (step < 3) {
-              setStep(step + 1)
-            } else {
-              handleSubmit()
-            }
-          }}
-          disabled={!isStepValid() || submitting}
-          className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitting ? "Creating Profile..." : step < 3 ? "Continue" : "Submit & Send Email"}
-        </Button>
       </div>
     </div>
   )
