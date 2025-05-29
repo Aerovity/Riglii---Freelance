@@ -6,11 +6,36 @@ import { ChevronDown, ArrowRight, Star, Heart, Briefcase, Code, Palette, Camera 
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "./language-provider"
 import { useEffect, useRef, useState } from "react"
+import { createClient } from "@/utils/supabase/client"
+import FreelancerCard from "@/components/freelancer-card"
+
+interface FreelancerData {
+  id: string
+  user_id: string
+  first_name: string | null
+  last_name: string | null
+  display_name: string | null
+  description: string | null
+  occupation: string | null
+  custom_occupation: string | null
+  price: number | null
+  users?: {
+    email: string
+    user_metadata?: {
+      full_name?: string
+      name?: string
+    }
+  }
+}
 
 export default function Home() {
   const { t } = useLanguage()
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set())
+  const [randomFreelancers, setRandomFreelancers] = useState<FreelancerData[]>([])
+  const [loadingFreelancers, setLoadingFreelancers] = useState(true)
   const observerRef = useRef<IntersectionObserver | null>(null)
+
+  const supabase = createClient()
 
   // Function to format price in DZD
   const formatPrice = (amount: number) => {
@@ -20,6 +45,61 @@ export default function Home() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(amount)
+  }
+
+  // Fetch random freelancers
+  const fetchRandomFreelancers = async () => {
+    setLoadingFreelancers(true)
+    try {
+      // Get random freelancers from the public view
+      const { data: freelancerData, error: freelancerError } = await supabase
+        .from("public_freelancer_profiles")
+        .select("*")
+        .limit(6)
+        .order("created_at", { ascending: false })
+
+      if (freelancerError) {
+        console.error("Error fetching freelancers:", freelancerError)
+        return
+      }
+
+      if (!freelancerData || freelancerData.length === 0) {
+        setRandomFreelancers([])
+        return
+      }
+
+      // Get user data for the freelancers
+      const userIds = freelancerData.map((f) => f.user_id)
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, email, user_metadata")
+        .in("id", userIds)
+
+      if (userError) {
+        console.error("Error fetching user data:", userError)
+      }
+
+      // Combine freelancer and user data
+      const combinedData = freelancerData.map((freelancer) => {
+        const user = userData?.find((u) => u.id === freelancer.user_id)
+        return {
+          ...freelancer,
+          users: user
+            ? {
+                email: user.email,
+                user_metadata: user.user_metadata,
+              }
+            : undefined,
+        }
+      })
+
+      setRandomFreelancers(combinedData)
+    } catch (error) {
+      console.error("Error:", error)
+      setRandomFreelancers([])
+    } finally {
+      setLoadingFreelancers(false)
+    }
   }
 
   // Intersection Observer for smooth animations
@@ -52,50 +132,43 @@ export default function Home() {
     }
   }, [])
 
+  // Fetch random freelancers on component mount
+  useEffect(() => {
+    fetchRandomFreelancers()
+  }, [])
+
   const categories = [
     {
       id: 1,
       title: "Web Development",
       description: "Professional websites and web applications",
       icon: Code,
-      image: "/placeholder.svg?height=200&width=300&text=Web+Development",
-      price: 2500,
-      rating: 4.9,
-      reviews: 156,
-      seller: "Tech Expert",
+      image: "/web-development-tools.jpg",
+      slug: "web-development",
     },
     {
       id: 2,
       title: "Graphic Design",
       description: "Creative designs for your brand",
       icon: Palette,
-      image: "/placeholder.svg?height=200&width=300&text=Graphic+Design",
-      price: 1800,
-      rating: 4.8,
-      reviews: 203,
-      seller: "Design Pro",
+      image: "/Adobe-Photoshop.jpg",
+      slug: "graphic-design",
     },
     {
       id: 3,
       title: "Digital Marketing",
       description: "Grow your business online",
       icon: Briefcase,
-      image: "/placeholder.svg?height=200&width=300&text=Digital+Marketing",
-      price: 3200,
-      rating: 4.7,
-      reviews: 89,
-      seller: "Marketing Guru",
+      image: "/marketing.jpg",
+      slug: "digital-marketing",
     },
     {
       id: 4,
       title: "Photography",
       description: "Capture your special moments",
       icon: Camera,
-      image: "/placeholder.svg?height=200&width=300&text=Photography",
-      price: 2100,
-      rating: 5.0,
-      reviews: 124,
-      seller: "Photo Artist",
+      image: "/camera.jpg",
+      slug: "photography",
     },
   ]
 
@@ -123,7 +196,7 @@ export default function Home() {
           >
             <h1 className="text-4xl md:text-5xl font-bold mb-4">{t("meetRiglii")}</h1>
             <p className="text-lg mb-6">{t("meetRigliiDesc")}</p>
-            <Link href="/account">
+            <Link href="/login">
               <Button className="bg-[#00D37F] hover:bg-[#00c070] text-white rounded-full px-6 py-2 flex items-center gap-2 transform hover:scale-105 transition-all duration-300">
                 {t("startGenerating")} <ArrowRight className="h-4 w-4" />
               </Button>
@@ -285,9 +358,10 @@ export default function Home() {
             {categories.map((category, index) => {
               const IconComponent = category.icon
               return (
-                <div
+                <Link
                   key={category.id}
-                  className={`group relative rounded-lg overflow-hidden border border-gray-200 bg-white transform hover:scale-105 hover:shadow-xl transition-all duration-500 ${
+                  href={`/${category.slug}`}
+                  className={`group relative rounded-lg overflow-hidden border border-gray-200 bg-white transform hover:scale-105 hover:shadow-xl transition-all duration-500 cursor-pointer ${
                     visibleSections.has("categories") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
                   }`}
                   style={{ transitionDelay: `${400 + index * 100}ms` }}
@@ -317,78 +391,106 @@ export default function Home() {
                       <div className="w-8 h-8 rounded-full bg-[#AFF8C8] flex items-center justify-center text-[#014751]">
                         <IconComponent className="h-4 w-4" />
                       </div>
-                      <div>
-                        <p className="text-sm font-medium text-[#0F2830]">{category.seller}</p>
-                        <p className="text-xs text-gray-500">Professional</p>
-                      </div>
+                      <h3 className="font-semibold text-[#0F2830] group-hover:text-[#00D37F] transition-colors duration-300">
+                        {category.title}
+                      </h3>
                     </div>
 
-                    <h3 className="font-semibold text-[#0F2830] mb-2 group-hover:text-[#00D37F] transition-colors duration-300">
-                      {category.title}
-                    </h3>
-                    <p className="text-sm text-gray-600 mb-3 line-clamp-2">{category.description}</p>
+                    <p className="text-sm text-gray-600 mb-4 line-clamp-2">{category.description}</p>
 
-                    <div className="flex items-center text-sm text-amber-500 mb-3">
-                      <Star className="h-4 w-4 fill-amber-500 stroke-amber-500" />
-                      <span className="ml-1 font-medium">{category.rating}</span>
-                      <span className="text-gray-400 ml-1">({category.reviews})</span>
-                    </div>
-
-                    <div className="flex justify-between items-center pt-3 border-t border-gray-100">
-                      <p className="text-xs text-gray-500">{t("from")}</p>
-                      <p className="font-bold text-[#0F2830]">{formatPrice(category.price)}</p>
+                    <div className="flex items-center justify-center pt-3 border-t border-gray-100">
+                      <span className="text-[#00D37F] font-medium text-sm group-hover:underline">
+                        {t("exploreCategory") || "Explore Category"}
+                      </span>
+                      <ArrowRight className="h-4 w-4 ml-2 text-[#00D37F] group-hover:translate-x-1 transition-transform duration-300" />
                     </div>
                   </div>
-                </div>
+                </Link>
               )
             })}
           </div>
         </div>
       </section>
 
-      {/* Get Inspired Section */}
+      {/* Featured Freelancers Section */}
       <section
-        id="inspired"
+        id="freelancers"
         data-animate
         className={`py-12 bg-[#AFF8C8]/10 transition-all duration-1000 ${
-          visibleSections.has("inspired") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+          visibleSections.has("freelancers") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
         }`}
       >
         <div className="container mx-auto px-4">
-          <h2
-            className={`text-2xl font-bold text-[#0F2830] mb-8 transition-all duration-1000 delay-200 ${
-              visibleSections.has("inspired") ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-5"
+          <div
+            className={`flex justify-between items-center mb-8 transition-all duration-1000 delay-200 ${
+              visibleSections.has("freelancers") ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-5"
             }`}
           >
-            {t("getInspired")}
-          </h2>
+            <div>
+              <h2 className="text-2xl font-bold text-[#0F2830] mb-2">{t("getInspired") || "Featured Freelancers"}</h2>
+              <p className="text-gray-600">Discover talented professionals ready to bring your projects to life</p>
+            </div>
+            <Link href="/browse" className="text-[#00D37F] font-medium text-sm hover:underline">
+              View All Freelancers
+            </Link>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((item, index) => (
-              <div
-                key={item}
-                className={`group relative rounded-lg overflow-hidden bg-white transform hover:scale-105 hover:shadow-xl transition-all duration-500 ${
-                  visibleSections.has("inspired") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
-                }`}
-                style={{ transitionDelay: `${400 + index * 100}ms` }}
-              >
-                <div className="relative h-64 w-full overflow-hidden">
-                  <Image
-                    src={`/placeholder.svg?height=300&width=400&text=Project${item}`}
-                    alt="Project image"
-                    fill
-                    className="object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end">
-                    <div className="p-4 text-white transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                      <h3 className="font-medium mb-1">Amazing Project Title</h3>
-                      <p className="text-sm">by Talented Freelancer</p>
+          {loadingFreelancers ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="bg-gray-200 h-48 rounded-t-xl"></div>
+                  <div className="p-4 bg-white rounded-b-xl border border-t-0">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded mb-1"></div>
+                        <div className="h-3 bg-gray-200 rounded w-20"></div>
+                      </div>
                     </div>
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
                   </div>
                 </div>
+              ))}
+            </div>
+          ) : randomFreelancers.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {randomFreelancers.map((freelancer, index) => (
+                <div
+                  key={freelancer.id}
+                  className={`transition-all duration-1000 ${
+                    visibleSections.has("freelancers") ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10"
+                  }`}
+                  style={{ transitionDelay: `${400 + index * 100}ms` }}
+                >
+                  <FreelancerCard
+                    freelancer={{
+                      ...freelancer,
+                      email: freelancer.users?.email,
+                      user_metadata: freelancer.users?.user_metadata,
+                    }}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <div className="text-gray-400 mb-4">
+                <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1}
+                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                  />
+                </svg>
               </div>
-            ))}
-          </div>
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">No freelancers available</h3>
+              <p className="text-gray-500">Check back later for featured freelancers!</p>
+            </div>
+          )}
         </div>
       </section>
     </div>
