@@ -13,6 +13,7 @@ import { useLanguage } from "@/app/language-provider"
 import NotificationsDropdown from "@/components/notifications-dropdown"
 import MessagesDropdown from "@/components/messages-dropdown"
 import CategoriesDropdown from "@/components/categories-dropdown"
+import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +33,7 @@ export default function SiteHeader() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const supabase = createClient()
+  const router = useRouter()
 
   // Function to download avatar image from Supabase storage
   const downloadAvatar = async (path: string) => {
@@ -117,6 +119,8 @@ export default function SiteHeader() {
       setAvatarUrl(null)
     }
     await supabase.auth.signOut()
+    // Redirect to home page after sign out
+    router.push('/')
   }
 
   const getUserInitials = (user: User) => {
@@ -185,7 +189,7 @@ export default function SiteHeader() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="relative h-8 w-8 rounded-full">
                     <Avatar className="h-8 w-8">
-                      <AvatarImage src={avatarUrl || ""} alt="Profile" />
+                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}
                       <AvatarFallback className="bg-[#00D37F] text-white text-sm font-medium">
                         {getUserInitials(user)}
                       </AvatarFallback>

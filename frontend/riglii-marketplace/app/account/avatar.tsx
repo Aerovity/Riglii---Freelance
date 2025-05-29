@@ -135,7 +135,7 @@ export default function Avatar({ uid, url, size, onUpload }: AvatarProps) {
           className="h-[120px] w-[120px] border-4 border-background shadow-md"
           style={{ width: size, height: size }}
         >
-          <AvatarImage src={avatarUrl || ""} alt="Profile picture" />
+          {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile picture" />}
           <AvatarFallback className="bg-primary/10 text-primary text-xl font-medium">{getInitials()}</AvatarFallback>
         </UIAvatar>
 

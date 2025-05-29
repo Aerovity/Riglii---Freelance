@@ -162,7 +162,7 @@ export default function AccountForm({ user }: { user: User | null }) {
               {loading ? "Updating..." : "Update Profile"}
             </Button>
 
-            <form action="/auth/signout" method="post" className="flex-1">
+            <form action="/api/auth/signout" method="post" className="flex-1">
               <Button type="submit" variant="outline" className="w-full" disabled={loading}>
                 Sign Out
               </Button>

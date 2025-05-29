@@ -172,9 +172,7 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Seller Name</p>
-                      <div className="flex items-center text-xs text-gray-500">
-                        Level {item} <span className="mx-1">•</span> Top Rated
-                      </div>
+                      
                     </div>
                   </div>
 
