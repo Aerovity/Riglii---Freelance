@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import type { User } from "@supabase/supabase-js"
-import LanguageSelector from "@/components/language-selector"
 import { useLanguage } from "@/app/language-provider"
 import NotificationsDropdown from "@/components/notifications-dropdown"
 import MessagesDropdown from "@/components/messages-dropdown"
@@ -184,7 +183,7 @@ export default function SiteHeader() {
             <Link href="/business" className="text-[#0F2830] hover:text-[#00D37F] text-sm font-medium">
               {t("business")}
             </Link>
-            <LanguageSelector />
+            
 
             {/* Show notifications and messages when user is logged in */}
             {user && (

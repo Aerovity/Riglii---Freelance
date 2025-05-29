@@ -6,10 +6,8 @@ import { ChevronDown, ArrowRight, Star, Heart } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "./language-provider"
 
-// Update the existing Home component
 export default function Home() {
-  const { t, language } = useLanguage()
-  const isRtl = language === "ar"
+  const { t } = useLanguage()
 
   // Function to format price in DZD
   const formatPrice = (amount: number) => {
@@ -22,7 +20,7 @@ export default function Home() {
   }
 
   return (
-    <div className={`${isRtl ? "rtl" : "ltr"}`}>
+    <div>
       {/* Hero Section */}
       <section className="bg-gradient-to-r from-[#014751] to-[#0F2830] text-white">
         <div className="container mx-auto px-4 py-16 md:py-24 flex flex-col md:flex-row items-center">
@@ -172,7 +170,6 @@ export default function Home() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">Seller Name</p>
-                      
                     </div>
                   </div>
 
