@@ -50,18 +50,10 @@ export default function CategoryPage() {
     setLoading(true)
     try {
       // First, let's get the freelancer profiles with a simpler query
-      let query = supabase.from("freelancer_profiles").select(`
-        id,
-        user_id,
-        first_name,
-        last_name,
-        display_name,
-        description,
-        occupation,
-        custom_occupation,
-        price,
-        created_at
-      `)
+      // Replace the existing query with:
+      let query = supabase.from("public_freelancer_profiles").select(`*`)
+
+// Remove the separate user query since the view already includes user data
 
       // Search for category in multiple fields - simplified approach
       const searchTerm = category.toLowerCase()

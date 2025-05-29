@@ -32,6 +32,7 @@ export default function SiteHeader() {
   const [loading, setLoading] = useState(true)
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
   const supabase = createClient()
   const router = useRouter()
 
@@ -138,6 +139,15 @@ export default function SiteHeader() {
     return "U"
   }
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      // Replace spaces with hyphens for URL-friendly format
+      const urlFriendlyQuery = searchQuery.trim().toLowerCase().replace(/\s+/g, '-')
+      router.push(`/${urlFriendlyQuery}`)
+    }
+  }
+
   return (
     <>
       {/* Header */}
@@ -147,21 +157,24 @@ export default function SiteHeader() {
             <Link href="/" className="flex items-center shrink-0">
               <Image src="/Riglii_logo.png" alt="Riglii Logo" width={360} height={120} className="h-20 w-auto" />
             </Link>
-            <div className="relative flex items-center flex-1 max-w-xl">
+            <form onSubmit={handleSearch} className="relative flex items-center flex-1 max-w-xl">
               <Input
                 type="text"
                 placeholder={t("search")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pr-10 border-gray-300 focus:border-[#00D37F] focus:ring-[#00D37F]"
                 dir={isRtl ? "rtl" : "ltr"}
               />
               <Button
+                type="submit"
                 size="icon"
                 variant="ghost"
                 className="absolute right-0 bg-[#00D37F] text-white rounded-l-none h-full"
               >
                 <Search className="h-4 w-4" />
               </Button>
-            </div>
+            </form>
           </div>
 
           <nav className="hidden md:flex items-center gap-4">
