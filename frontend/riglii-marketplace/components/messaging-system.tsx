@@ -106,6 +106,8 @@ export default function ModernMessaging({ user }: { user: User }) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const previousMessagesRef = useRef<Message[]>([])
   const supabase = createClient()
   const { toast } = useToast()
 
@@ -175,6 +177,38 @@ export default function ModernMessaging({ user }: { user: User }) {
     }
   }, [user.id, activeConversation])
 
+  // Set up polling for active conversation
+  useEffect(() => {
+    // Clear any existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current)
+      pollingIntervalRef.current = null
+    }
+
+    // Set up new interval if there's an active conversation
+    if (activeConversation) {
+      console.log('Setting up polling for conversation:', activeConversation)
+      
+      // Initial fetch
+      fetchMessages(activeConversation)
+      
+      // Set up polling interval
+      pollingIntervalRef.current = setInterval(() => {
+        console.log('Polling messages for conversation:', activeConversation)
+        fetchMessages(activeConversation, true) // true = silent fetch (no loading state)
+      }, 500) // 0.5 seconds
+    }
+
+    // Cleanup on unmount or when activeConversation changes
+    return () => {
+      if (pollingIntervalRef.current) {
+        console.log('Clearing polling interval')
+        clearInterval(pollingIntervalRef.current)
+        pollingIntervalRef.current = null
+      }
+    }
+  }, [activeConversation])
+
   // Fetch users when dialog opens
   useEffect(() => {
     if (showNewMessageDialog && isCurrentUserFreelancer !== null) {
@@ -184,7 +218,11 @@ export default function ModernMessaging({ user }: { user: User }) {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom()
+    // Only scroll if new messages were added
+    if (messages.length > previousMessagesRef.current.length) {
+      scrollToBottom()
+    }
+    previousMessagesRef.current = messages
   }, [messages])
 
   // Reset search when dialog closes
@@ -302,8 +340,12 @@ export default function ModernMessaging({ user }: { user: User }) {
     }
   }
 
-  const fetchMessages = async (conversationId: string) => {
+  const fetchMessages = async (conversationId: string, silent: boolean = false) => {
     try {
+      if (!silent) {
+        console.log('Fetching messages for conversation:', conversationId)
+      }
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
@@ -311,7 +353,7 @@ export default function ModernMessaging({ user }: { user: User }) {
         .order('created_at', { ascending: true })
 
       if (error) throw error
-
+      
       // Process messages to include sender info
       const processedMessages = await Promise.all(
         (data || []).map(async (msg) => {
@@ -370,14 +412,21 @@ export default function ModernMessaging({ user }: { user: User }) {
           .from('messages')
           .update({ is_read: true })
           .in('id', unreadMessageIds)
+        
+        // Update conversations to reflect read status
+        if (!silent) {
+          fetchConversations()
+        }
       }
     } catch (error) {
-      console.error('Error fetching messages:', error)
-      toast({
-        title: "Error",
-        description: "Failed to load messages",
-        variant: "destructive",
-      })
+      if (!silent) {
+        console.error('Error fetching messages:', error)
+        toast({
+          title: "Error",
+          description: "Failed to load messages",
+          variant: "destructive",
+        })
+      }
     }
   }
 
@@ -799,7 +848,6 @@ export default function ModernMessaging({ user }: { user: User }) {
                 key={conversation.id}
                 onClick={() => {
                   setActiveConversation(conversation.id)
-                  fetchMessages(conversation.id)
                 }}
                 className={`p-4 cursor-pointer hover:bg-gray-100 transition-colors ${
                   activeConversation === conversation.id ? "bg-blue-50" : ""
