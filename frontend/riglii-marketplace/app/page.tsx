@@ -471,6 +471,7 @@ export default function Home() {
                     freelancer={{
                       ...freelancer,
                       email: freelancer.users?.email,
+
                     }}
                   />
                 </div>
