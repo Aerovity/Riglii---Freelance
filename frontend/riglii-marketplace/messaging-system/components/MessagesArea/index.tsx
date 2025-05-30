@@ -80,6 +80,11 @@ export default function MessagesArea({
       <MessageInput
         onSendMessage={handleSendMessage}
         sending={sending}
+        conversation={activeConversation}
+        messages={messages}
+        currentUserId={currentUserId}
+        isCurrentUserFreelancer={isCurrentUserFreelancer || false}
+        onFormSent={onFormSent}
       />
     </div>
   )

@@ -1,28 +1,20 @@
-import { useState } from "react"
+
+import { useState, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import {
-  FileText,
-  Check,
-  X,
-  Clock,
-  DollarSign,
-  Calendar,
-  ChevronRight,
-  Loader2,
-} from "lucide-react"
+import { CheckCircle, XCircle, Clock, DollarSign, FileText } from "lucide-react"
 import type { Form } from "../../types"
-import { getTimeAgo, formatPrice } from "../../utils/formatters"
-import { COLORS } from "../../constants"
 
 interface FormDisplayProps {
   form: Form
@@ -31,237 +23,373 @@ interface FormDisplayProps {
 }
 
 export default function FormDisplay({ form, currentUserId, onStatusUpdate }: FormDisplayProps) {
-  const [loading, setLoading] = useState(false)
-  const [showDetails, setShowDetails] = useState(false)
+  const [showSignature, setShowSignature] = useState(false)
+  const [showRefuseDialog, setShowRefuseDialog] = useState(false)
+  const [refuseReason, setRefuseReason] = useState("")
+  const [updating, setUpdating] = useState(false)
+  const [isDrawing, setIsDrawing] = useState(false)
+  
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const contextRef = useRef<CanvasRenderingContext2D | null>(null)
+  
   const supabase = createClient()
   const { toast } = useToast()
 
-  const isReceiver = currentUserId === form.receiver_id
-  const isSender = currentUserId === form.sender_id
+  const isReceiver = form.receiver_id === currentUserId
+  const isSender = form.sender_id === currentUserId
   const canRespond = isReceiver && form.status === "pending"
 
-  const handleStatusUpdate = async (newStatus: "accepted" | "refused") => {
-    setLoading(true)
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return
+    
+    const rect = canvasRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    contextRef.current = canvasRef.current.getContext('2d')
+    if (contextRef.current) {
+      contextRef.current.beginPath()
+      contextRef.current.moveTo(x, y)
+      contextRef.current.strokeStyle = '#000'
+      contextRef.current.lineWidth = 2
+      setIsDrawing(true)
+    }
+  }
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDrawing || !canvasRef.current || !contextRef.current) return
+    
+    const rect = canvasRef.current.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    contextRef.current.lineTo(x, y)
+    contextRef.current.stroke()
+  }
+
+  const stopDrawing = () => {
+    setIsDrawing(false)
+  }
+
+  const clearSignature = () => {
+    if (!canvasRef.current || !contextRef.current) return
+    contextRef.current.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height)
+  }
+
+  const handleAccept = async () => {
+    if (!canvasRef.current) return
+    
+    // Check if canvas has any drawing
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const hasDrawing = imageData.data.some((channel, index) => {
+      // Check alpha channel (every 4th value)
+      return index % 4 === 3 && channel > 0
+    })
+
+    if (!hasDrawing) {
+      toast({
+        title: "Signature Required",
+        description: "Please provide your signature before accepting.",
+        variant: "destructive",
+      })
+      return
+    }
+    
+    const signatureData = canvas.toDataURL()
+    
+    setUpdating(true)
     try {
-      const { error } = await supabase
+      const { error: formError } = await supabase
         .from("forms")
         .update({
-          status: newStatus,
+          status: "accepted",
+          responded_at: new Date().toISOString(),
+          digital_signature: signatureData
+        })
+        .eq("id", form.id)
+
+      if (formError) throw formError
+
+      const { error: messageError } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: form.conversation_id,
+          sender_id: currentUserId,
+          receiver_id: form.sender_id,
+          content: "✅ Proposal accepted. You can now exchange messages.",
+          message_type: "text"
+        })
+
+      if (messageError) throw messageError
+
+      toast({
+        title: "Proposal Accepted",
+        description: "You have accepted the project proposal.",
+      })
+
+      setShowSignature(false)
+      onStatusUpdate?.()
+    } catch (error) {
+      console.error("Error accepting form:", error)
+      toast({
+        title: "Error",
+        description: "Failed to accept the proposal. Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  const handleRefuse = async () => {
+    setUpdating(true)
+    try {
+      const { error: formError } = await supabase
+        .from("forms")
+        .update({
+          status: "refused",
           responded_at: new Date().toISOString(),
         })
         .eq("id", form.id)
 
-      if (error) throw error
+      if (formError) throw formError
+
+      const { error: messageError } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: form.conversation_id,
+          sender_id: currentUserId,
+          receiver_id: form.sender_id,
+          content: `❌ Proposal refused${refuseReason ? `: ${refuseReason}` : ""}.`,
+          message_type: "text"
+        })
+
+      if (messageError) throw messageError
 
       toast({
-        title: newStatus === "accepted" ? "Form Accepted" : "Form Declined",
-        description: `You have ${newStatus} the project form`,
+        title: "Proposal Refused",
+        description: "You have refused the project proposal.",
       })
 
-      setShowDetails(false)
+      setShowRefuseDialog(false)
+      setRefuseReason("")
       onStatusUpdate?.()
     } catch (error) {
-      console.error("Error updating form status:", error)
+      console.error("Error refusing form:", error)
       toast({
         title: "Error",
-        description: "Failed to update form status",
+        description: "Failed to refuse the proposal. Please try again.",
         variant: "destructive",
       })
     } finally {
-      setLoading(false)
+      setUpdating(false)
     }
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
+  const getStatusBadge = () => {
+    switch (form.status) {
       case "accepted":
-        return `${COLORS.success.bg} ${COLORS.success.text} ${COLORS.success.border}`
+        return (
+          <Badge variant="outline" className="border-green-500 text-green-700">
+            <CheckCircle className="mr-1 h-3 w-3" />
+            Accepted
+          </Badge>
+        )
       case "refused":
-        return `${COLORS.error.bg} ${COLORS.error.text} ${COLORS.error.border}`
-      case "cancelled":
-        return `${COLORS.neutral.bg} ${COLORS.neutral.text} ${COLORS.neutral.border}`
+        return (
+          <Badge variant="outline" className="border-red-500 text-red-700">
+            <XCircle className="mr-1 h-3 w-3" />
+            Refused
+          </Badge>
+        )
       default:
-        return `${COLORS.warning.bg} ${COLORS.warning.text} ${COLORS.warning.border}`
+        return (
+          <Badge variant="outline" className="border-yellow-500 text-yellow-700">
+            <Clock className="mr-1 h-3 w-3" />
+            Pending
+          </Badge>
+        )
     }
   }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "accepted":
-        return <Check className="h-3 w-3" />
-      case "refused":
-        return <X className="h-3 w-3" />
-      default:
-        return <Clock className="h-3 w-3" />
-    }
-  }
-
-  const CompactView = () => (
-    <div className="flex justify-center my-4">
-      <Card
-        className={`w-full max-w-sm cursor-pointer transition-all hover:shadow-lg border-2 ${
-          form.status === "accepted"
-            ? "border-green-200 hover:border-green-300"
-            : form.status === "refused"
-              ? "border-red-200 hover:border-red-300"
-              : "border-[#00D37F] hover:border-[#00c070]"
-        }`}
-        onClick={() => setShowDetails(true)}
-      >
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-lg ${
-                form.status === "accepted" ? "bg-green-100" : 
-                form.status === "refused" ? "bg-red-100" : "bg-[#00D37F]/10"
-              }`}>
-                <FileText className={`h-5 w-5 ${
-                  form.status === "accepted" ? "text-green-600" : 
-                  form.status === "refused" ? "text-red-600" : "text-[#00D37F]"
-                }`} />
-              </div>
-              <div>
-                <h4 className="font-semibold text-sm line-clamp-1">{form.title}</h4>
-                <div className="flex items-center gap-2 text-xs text-gray-500">
-                  <span>{formatPrice(form.price)}</span>
-                  <span>•</span>
-                  <span>{form.time_estimate}</span>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Badge variant="outline" className={`${getStatusColor(form.status)} text-xs`}>
-                {getStatusIcon(form.status)}
-                <span className="ml-1">{form.status}</span>
-              </Badge>
-              <ChevronRight className="h-4 w-4 text-gray-400" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-
-  const DetailedView = () => (
-    <Dialog open={showDetails} onOpenChange={setShowDetails}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5 text-[#00D37F]" />
-            Project Form Details
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-lg">{form.title}</h3>
-            <Badge variant="outline" className={`${getStatusColor(form.status)} flex items-center gap-1`}>
-              {getStatusIcon(form.status)}
-              {form.status.charAt(0).toUpperCase() + form.status.slice(1)}
-            </Badge>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500">Price</p>
-                <span className="font-semibold">{formatPrice(form.price)}</span>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-gray-500" />
-              <div>
-                <p className="text-xs text-gray-500">Time Estimate</p>
-                <span className="font-semibold">{form.time_estimate}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium text-gray-700">Description</p>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-sm text-gray-600 leading-relaxed">{form.description}</p>
-            </div>
-          </div>
-
-          <div className="text-xs text-gray-500 border-t pt-3">
-            <div className="flex items-center gap-2">
-              <Clock className="h-3 w-3" />
-              <span>Sent {getTimeAgo(new Date(form.created_at))}</span>
-            </div>
-            {form.responded_at && (
-              <div className="flex items-center gap-2 mt-1">
-                <Check className="h-3 w-3" />
-                <span>Responded {getTimeAgo(new Date(form.responded_at))}</span>
-              </div>
-            )}
-          </div>
-
-          {canRespond && (
-            <div className="flex gap-2 pt-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleStatusUpdate("refused")}
-                disabled={loading}
-                className="flex-1 border-red-200 text-red-700 hover:bg-red-50"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <X className="h-4 w-4 mr-1" />
-                    Decline
-                  </>
-                )}
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleStatusUpdate("accepted")}
-                disabled={loading}
-                className="flex-1 bg-[#00D37F] hover:bg-[#00c070]"
-              >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <Check className="h-4 w-4 mr-1" />
-                    Accept
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-
-          {form.status !== "pending" && (
-            <div
-              className={`text-center py-3 px-4 rounded-md text-sm font-medium ${
-                form.status === "accepted" 
-                  ? "bg-green-50 text-green-700 border border-green-200" 
-                  : "bg-red-50 text-red-700 border border-red-200"
-              }`}
-            >
-              {form.status === "accepted" 
-                ? "✅ This form has been accepted" 
-                : "❌ This form has been declined"}
-            </div>
-          )}
-
-          {!canRespond && form.status === "pending" && isSender && (
-            <div className="text-center py-3 px-4 rounded-md text-sm bg-yellow-50 text-yellow-700 border border-yellow-200">
-              ⏳ Waiting for response
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
 
   return (
     <>
-      <CompactView />
-      <DetailedView />
+      <Card className="max-w-lg mx-auto my-4">
+        <CardHeader className="pb-4">
+          <div className="flex items-start justify-between">
+            <div className="space-y-1">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <FileText className="h-5 w-5 text-gray-500" />
+                {form.title}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Project Proposal
+              </p>
+            </div>
+            {getStatusBadge()}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">{form.description}</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Budget</p>
+              <p className="font-semibold flex items-center gap-1">
+                <DollarSign className="h-4 w-4" />
+                {form.price.toLocaleString()}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm text-muted-foreground">Timeline</p>
+              <p className="font-semibold">{form.time_estimate}</p>
+            </div>
+          </div>
+
+          {form.responded_at && (
+            <div className="pt-3 border-t">
+              <p className="text-sm text-muted-foreground">
+                {form.status === "accepted" ? "Accepted" : "Refused"} on{" "}
+                {new Date(form.responded_at).toLocaleDateString()}
+              </p>
+            </div>
+          )}
+
+          {/* Show buttons for receiver when pending */}
+          {form.status === "pending" && (
+            <div className="pt-4 border-t">
+              {isReceiver && (
+                <div className="flex gap-3">
+                  <Button
+                    onClick={() => setShowSignature(true)}
+                    disabled={updating}
+                    className="flex-1"
+                    style={{ backgroundColor: '#16a34a', color: 'white' }}
+                    type="button"
+                  >
+                    Accept & Sign
+                  </Button>
+                  <Button
+                    onClick={() => setShowRefuseDialog(true)}
+                    disabled={updating}
+                    variant="destructive"
+                    className="flex-1"
+                    type="button"
+                  >
+                    Refuse
+                  </Button>
+                </div>
+              )}
+              {isSender && (
+                <div className="text-center mt-3">
+                  <p className="text-sm text-yellow-600">
+                    ⏳ Waiting for response from freelancer
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Digital Signature Dialog */}
+      <Dialog open={showSignature} onOpenChange={setShowSignature}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Digital Signature Required</DialogTitle>
+            <DialogDescription>
+              Please sign below to accept this project proposal.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
+              <canvas
+                ref={canvasRef}
+                width={400}
+                height={200}
+                className="w-full cursor-crosshair"
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+                style={{ touchAction: 'none' }}
+              />
+            </div>
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={clearSignature}
+                disabled={updating}
+              >
+                Clear
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowSignature(false)}
+                disabled={updating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleAccept}
+                disabled={updating}
+                className="flex-1"
+                style={{ backgroundColor: '#16a34a', color: 'white' }}
+                type="button"
+              >
+                {updating ? "Accepting..." : "Accept & Submit"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Refuse Dialog */}
+      <Dialog open={showRefuseDialog} onOpenChange={setShowRefuseDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Refuse Proposal</DialogTitle>
+            <DialogDescription>
+              Please provide a reason for refusing (optional).
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <Textarea
+              value={refuseReason}
+              onChange={(e) => setRefuseReason(e.target.value)}
+              placeholder="Enter reason for refusing..."
+              rows={4}
+            />
+            
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowRefuseDialog(false)}
+                disabled={updating}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleRefuse}
+                disabled={updating}
+                variant="destructive"
+                className="flex-1"
+              >
+                {updating ? "Refusing..." : "Refuse Proposal"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

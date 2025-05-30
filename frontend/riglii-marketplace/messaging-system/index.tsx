@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
-import { startConversation } from "@/utils/message-utils"
 import { useToast } from "@/hooks/use-toast"
 import type { MessagingSystemProps } from "./types"
 import { useConversations } from "./hooks/useConversations"
@@ -18,6 +17,7 @@ export default function MessagingSystem({ user }: MessagingSystemProps) {
   const [showNewMessageDialog, setShowNewMessageDialog] = useState(false)
   const [isMobileView, setIsMobileView] = useState(false)
   const [isCurrentUserFreelancer, setIsCurrentUserFreelancer] = useState<boolean | null>(null)
+  const [allMessages, setAllMessages] = useState<any[]>([]) // Store all messages for status checking
 
   const supabase = createClient()
   const { toast } = useToast()
@@ -61,28 +61,63 @@ export default function MessagingSystem({ user }: MessagingSystemProps) {
     checkUserType()
   }, [user.id, supabase])
 
+  // Fetch all messages for form status checking
+  useEffect(() => {
+    const fetchAllMessages = async () => {
+      const conversationIds = conversations.map(c => c.id)
+      if (conversationIds.length === 0) return
+
+      const { data, error } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          form:forms(*),
+          sender:users!messages_sender_id_fkey(*)
+        `)
+        .in('conversation_id', conversationIds)
+        .order('created_at', { ascending: true })
+
+      if (!error && data) {
+        setAllMessages(data)
+      }
+    }
+
+    fetchAllMessages()
+  }, [conversations, supabase])
+
   // Set up real-time updates
   useRealtimeUpdates({
     userId: user.id,
     activeConversation,
     onNewMessage: (message) => {
-      // This will be handled by the polling in useMessages hook
+      // Refetch messages to get the latest
+      if (activeConversation) {
+        refetchMessages()
+      }
     },
     onFormUpdate: () => {
       if (activeConversation) {
         refetchMessages()
       }
+      refetchConversations()
     },
     onConversationUpdate: refetchConversations
   })
 
   const handleStartNewConversation = async (recipientId: string) => {
     try {
-      const conversationId = await startConversation(recipientId)
-      setActiveConversation(conversationId)
+      // The NewMessageDialog now handles form creation for clients
+      // Just select the conversation
+      const existingConversation = conversations.find(c => 
+        c.participant.id === recipientId
+      )
+      
+      if (existingConversation) {
+        setActiveConversation(existingConversation.id)
+      }
+      
       setShowNewMessageDialog(false)
       await refetchConversations()
-      await refetchMessages()
     } catch (error) {
       console.error('Error starting conversation:', error)
       toast({
@@ -100,7 +135,7 @@ export default function MessagingSystem({ user }: MessagingSystemProps) {
     attachmentType?: string | null
   ) => {
     const result = await sendMessage(content, receiverId, attachmentUrl, attachmentType)
-    if (result.success) {
+    if (result && result.success) {
       refetchConversations()
     }
     return result
@@ -122,6 +157,7 @@ export default function MessagingSystem({ user }: MessagingSystemProps) {
         isMobileView={isMobileView}
         onConversationSelect={setActiveConversation}
         onNewMessage={() => setShowNewMessageDialog(true)}
+        messages={allMessages}
       />
 
       <MessagesArea
@@ -132,7 +168,10 @@ export default function MessagingSystem({ user }: MessagingSystemProps) {
         isMobileView={isMobileView}
         sending={sending}
         onBack={handleMobileBack}
-        onFormSent={refetchMessages}
+        onFormSent={() => {
+          refetchMessages()
+          refetchConversations()
+        }}
         onNewMessage={() => setShowNewMessageDialog(true)}
         onSendMessage={handleSendMessage}
       />

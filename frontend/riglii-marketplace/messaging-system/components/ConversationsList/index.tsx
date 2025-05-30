@@ -14,6 +14,7 @@ interface ConversationsListProps {
   isMobileView: boolean
   onConversationSelect: (conversationId: string) => void
   onNewMessage: () => void
+  messages?: any[] // Add messages prop
 }
 
 export default function ConversationsList({
@@ -23,13 +24,16 @@ export default function ConversationsList({
   loading,
   isMobileView,
   onConversationSelect,
-  onNewMessage
+  onNewMessage,
+  messages = []
 }: ConversationsListProps) {
   const [searchQuery, setSearchQuery] = useState("")
 
   const filteredConversations = conversations.filter((conv) =>
-    conv.participant.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.participant.email.toLowerCase().includes(searchQuery.toLowerCase())
+    conv.participants?.some((participant: any) =>
+      participant.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      participant.email?.toLowerCase().includes(searchQuery.toLowerCase())
+    )
   )
 
   return (
@@ -72,6 +76,7 @@ export default function ConversationsList({
                 isActive={activeConversation === conversation.id}
                 currentUserId={currentUserId}
                 onClick={() => onConversationSelect(conversation.id)}
+                messages={messages}
               />
             ))}
           </div>
