@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -108,7 +109,9 @@ export default function ModernMessaging({ user }: { user: User }) {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const previousMessagesRef = useRef<Message[]>([])
+  const previousMessageCountRef = useRef<number>(0)
   const supabase = createClient()
+  const router = useRouter()
   const { toast } = useToast()
 
   // Check for mobile view
@@ -218,11 +221,11 @@ export default function ModernMessaging({ user }: { user: User }) {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    // Only scroll if new messages were added
-    if (messages.length > previousMessagesRef.current.length) {
+    // Only scroll if new messages were added (not on every render)
+    if (messages.length > previousMessageCountRef.current) {
       scrollToBottom()
     }
-    previousMessagesRef.current = messages
+    previousMessageCountRef.current = messages.length
   }, [messages])
 
   // Reset search when dialog closes
@@ -854,8 +857,16 @@ export default function ModernMessaging({ user }: { user: User }) {
                 }`}
               >
                 <div className="flex items-start space-x-3">
-                  <div className="relative">
-                    <Avatar className="h-12 w-12">
+                  <div 
+                    className="relative cursor-pointer group"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (conversation.participant.is_freelancer) {
+                        router.push(`/freelancer/${conversation.participant.id}`)
+                      }
+                    }}
+                  >
+                    <Avatar className={`h-12 w-12 ${conversation.participant.is_freelancer ? 'group-hover:ring-2 group-hover:ring-[#00D37F] transition-all' : ''}`}>
                       {conversation.participant.avatar_url && (
                         <AvatarImage src={conversation.participant.avatar_url} />
                       )}
@@ -921,14 +932,23 @@ export default function ModernMessaging({ user }: { user: User }) {
                     <ArrowLeft className="h-5 w-5" />
                   </Button>
                 )}
-                <Avatar className="h-10 w-10">
-                  {activeConversationData.participant.avatar_url && (
-                    <AvatarImage src={activeConversationData.participant.avatar_url} />
-                  )}
-                  <AvatarFallback className="bg-[#00D37F] text-white">
-                    {getUserInitials(activeConversationData.participant.full_name)}
-                  </AvatarFallback>
-                </Avatar>
+                <div 
+                  className={`${activeConversationData.participant.is_freelancer ? "cursor-pointer group" : ""}`}
+                  onClick={() => {
+                    if (activeConversationData.participant.is_freelancer) {
+                      router.push(`/freelancer/${activeConversationData.participant.id}`)
+                    }
+                  }}
+                >
+                  <Avatar className={`h-10 w-10 ${activeConversationData.participant.is_freelancer ? 'group-hover:ring-2 group-hover:ring-[#00D37F] transition-all' : ''}`}>
+                    {activeConversationData.participant.avatar_url && (
+                      <AvatarImage src={activeConversationData.participant.avatar_url} />
+                    )}
+                    <AvatarFallback className="bg-[#00D37F] text-white">
+                      {getUserInitials(activeConversationData.participant.full_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
                 <div>
                   <h3 className="font-semibold">{activeConversationData.participant.full_name}</h3>
                   {activeConversationData.participant.is_freelancer && (
@@ -951,7 +971,13 @@ export default function ModernMessaging({ user }: { user: User }) {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem>View Profile</DropdownMenuItem>
+                    {activeConversationData.participant.is_freelancer && (
+                      <DropdownMenuItem 
+                        onClick={() => router.push(`/freelancer/${activeConversationData.participant.id}`)}
+                      >
+                        View Profile
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem>Clear Chat</DropdownMenuItem>
                     <DropdownMenuItem className="text-red-600">Block User</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1146,12 +1172,22 @@ export default function ModernMessaging({ user }: { user: User }) {
                       className="p-3 hover:bg-gray-100 rounded-lg cursor-pointer transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          {result.avatar_url && <AvatarImage src={result.avatar_url} />}
-                          <AvatarFallback className="bg-[#00D37F] text-white">
-                            {getUserInitials(result.full_name)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div 
+                          className={`${result.is_freelancer ? "cursor-pointer group" : ""}`}
+                          onClick={(e) => {
+                            if (result.is_freelancer) {
+                              e.stopPropagation()
+                              router.push(`/freelancer/${result.id}`)
+                            }
+                          }}
+                        >
+                          <Avatar className={`h-10 w-10 ${result.is_freelancer ? 'group-hover:ring-2 group-hover:ring-[#00D37F] transition-all' : ''}`}>
+                            {result.avatar_url && <AvatarImage src={result.avatar_url} />}
+                            <AvatarFallback className="bg-[#00D37F] text-white">
+                              {getUserInitials(result.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium">{result.full_name}</p>
