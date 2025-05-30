@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
-import MessagingSystem from '@/components/messaging-system'
+import MessagingSystem from '@/messaging-system'
 
 export default async function MessagesPage() {
   const supabase = await createClient()
