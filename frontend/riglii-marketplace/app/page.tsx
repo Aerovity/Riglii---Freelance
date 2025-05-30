@@ -468,8 +468,6 @@ export default function Home() {
                   <FreelancerCard
                     freelancer={{
                       ...freelancer,
-                      email: freelancer.users?.email,
-                      user_metadata: freelancer.users?.user_metadata,
                     }}
                   />
                 </div>
