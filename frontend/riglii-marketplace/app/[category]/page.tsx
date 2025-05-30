@@ -21,10 +21,6 @@ interface FreelancerData {
   price: number | null
   users?: {
     email: string
-    user_metadata?: {
-      full_name?: string
-      name?: string
-    }
   }
 }
 
@@ -49,13 +45,9 @@ export default function CategoryPage() {
   const fetchFreelancers = async (page: number, sort: SortOption) => {
     setLoading(true)
     try {
-      // First, let's get the freelancer profiles with a simpler query
-      // Replace the existing query with:
+      // First, get freelancer profiles with category search
       let query = supabase.from("public_freelancer_profiles").select(`*`)
 
-// Remove the separate user query since the view already includes user data
-
-      // Search for category in multiple fields - simplified approach
       const searchTerm = category.toLowerCase()
 
       // Use a simpler or condition without complex formatting
@@ -98,27 +90,33 @@ export default function CategoryPage() {
         return
       }
 
-      // Get user data separately for the freelancers we found
+      // Get user data and filter by is_freelancer = true
       const userIds = freelancerData.map((f) => f.user_id)
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("id, email, user_metadata")
+        .select("id, email, is_freelancer") // Removed user_metadata
         .in("id", userIds)
+        .eq("is_freelancer", true) // Only get users where is_freelancer is true
 
       if (userError) {
         console.error("Error fetching user data:", userError)
-        // Continue without user data
+        setFreelancers([])
+        setTotalCount(0)
+        return
       }
 
+      // Only include freelancers whose users have is_freelancer = true
+      const validUserIds = userData?.map(u => u.id) || []
+      const filteredFreelancerData = freelancerData.filter(f => validUserIds.includes(f.user_id))
+
       // Combine freelancer and user data
-      const combinedData = freelancerData.map((freelancer) => {
+      const combinedData = filteredFreelancerData.map((freelancer) => {
         const user = userData?.find((u) => u.id === freelancer.user_id)
         return {
           ...freelancer,
           users: user
             ? {
                 email: user.email,
-                user_metadata: user.user_metadata,
               }
             : undefined,
         }
@@ -126,10 +124,22 @@ export default function CategoryPage() {
 
       setFreelancers(combinedData)
 
-      // Get total count for pagination with a separate simpler query
-      const { count } = await supabase
+      // Get total count for pagination with the same filters including is_freelancer check
+      // We need to do a join to count only freelancers with is_freelancer = true
+      const { data: countData, error: countError } = await supabase
         .from("freelancer_profiles")
-        .select("*", { count: "exact", head: true })
+        .select(`
+          id,
+          user_id,
+          occupation,
+          custom_occupation,
+          description,
+          display_name,
+          first_name,
+          last_name,
+          users!inner(is_freelancer)
+        `)
+        .eq("users.is_freelancer", true)
         .or(
           `occupation.ilike.%${searchTerm}%,` +
             `custom_occupation.ilike.%${searchTerm}%,` +
@@ -139,7 +149,12 @@ export default function CategoryPage() {
             `last_name.ilike.%${searchTerm}%`,
         )
 
-      setTotalCount(count || 0)
+      if (countError) {
+        console.error("Error getting count:", countError)
+        setTotalCount(combinedData.length) // Fallback to current page count
+      } else {
+        setTotalCount(countData?.length || 0)
+      }
     } catch (error) {
       console.error("Error:", error)
       setFreelancers([])
@@ -329,7 +344,6 @@ export default function CategoryPage() {
                   freelancer={{
                     ...freelancer,
                     email: freelancer.users?.email,
-                    user_metadata: freelancer.users?.user_metadata,
                   }}
                 />
               ))}

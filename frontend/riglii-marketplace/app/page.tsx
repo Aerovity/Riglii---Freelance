@@ -21,10 +21,6 @@ interface FreelancerData {
   price: number | null
   users?: {
     email: string
-    user_metadata?: {
-      full_name?: string
-      name?: string
-    }
   }
 }
 
@@ -47,7 +43,7 @@ export default function Home() {
     }).format(amount)
   }
 
-  // Fetch random freelancers
+  // Fetch random freelancers with is_freelancer filtering
   const fetchRandomFreelancers = async () => {
     setLoadingFreelancers(true)
     try {
@@ -68,26 +64,32 @@ export default function Home() {
         return
       }
 
-      // Get user data for the freelancers
+      // Get user data and filter by is_freelancer = true
       const userIds = freelancerData.map((f) => f.user_id)
       const { data: userData, error: userError } = await supabase
         .from("users")
-        .select("id, email, user_metadata")
+        .select("id, email, is_freelancer")
         .in("id", userIds)
+        .eq("is_freelancer", true) // Only get users where is_freelancer is true
 
       if (userError) {
         console.error("Error fetching user data:", userError)
+        setRandomFreelancers([])
+        return
       }
 
+      // Only include freelancers whose users have is_freelancer = true
+      const validUserIds = userData?.map(u => u.id) || []
+      const filteredFreelancerData = freelancerData.filter(f => validUserIds.includes(f.user_id))
+
       // Combine freelancer and user data
-      const combinedData = freelancerData.map((freelancer) => {
+      const combinedData = filteredFreelancerData.map((freelancer) => {
         const user = userData?.find((u) => u.id === freelancer.user_id)
         return {
           ...freelancer,
           users: user
             ? {
                 email: user.email,
-                user_metadata: user.user_metadata,
               }
             : undefined,
         }
@@ -469,7 +471,6 @@ export default function Home() {
                     freelancer={{
                       ...freelancer,
                       email: freelancer.users?.email,
-                      user_metadata: freelancer.users?.user_metadata,
                     }}
                   />
                 </div>
