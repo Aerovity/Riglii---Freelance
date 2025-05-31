@@ -1,9 +1,9 @@
 import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, Paperclip, FileText, Receipt, Loader2, Upload } from "lucide-react"
+import { Send, Paperclip, FileText, Receipt, Loader2, Upload, CheckCircle } from "lucide-react"
 import OfferForm from "../Forms/OfferForm"
-import ProjectSubmission from "../Forms/Projectsubmission"
+import ProjectSubmission from "../Forms/ProjectSubmission"
 
 interface MessageInputProps {
   onSendMessage: (content: string, file?: File) => Promise<void>
@@ -30,43 +30,27 @@ export default function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Get all forms in the conversation
-  // Handle legacy forms without form_type field
   const allForms = messages.filter(m => m.message_type === 'form' && m.form)
   
-  // Debug log all forms
-  console.log('All forms:', allForms.map(f => ({
-    id: f.form?.id,
-    title: f.form?.title,
-    form_type: f.form?.form_type,
-    status: f.form?.status,
-    sender_id: f.form?.sender_id
-  })))
-  
-  // Filter forms - use sender_id to determine type if form_type is missing
+  // Filter forms - use form_type when available
   const proposalForms = allForms.filter(m => {
-    // If form_type exists, use it
     if (m.form.form_type) {
       return m.form.form_type === 'proposal'
     }
-    // Otherwise, proposals come from clients (non-freelancers)
-    // This is a temporary workaround - you should fix the query to include form_type
     return m.form.sender_id !== currentUserId || !isCurrentUserFreelancer
   })
   
   const commercialForms = allForms.filter(m => {
-    // If form_type exists, use it
     if (m.form.form_type) {
       return m.form.form_type === 'commercial'
     }
-    // Otherwise, commercial forms come from freelancers
-    // Check if the form has characteristics of a commercial form
     return m.form.sender_id === currentUserId && isCurrentUserFreelancer
   })
 
   // Check if there's an accepted proposal
   const acceptedProposal = proposalForms.find(m => m.form?.status === 'accepted')
   
-  // Check if there's any commercial form (pending, accepted, or refused)
+  // Check commercial form states
   const hasCommercialForm = commercialForms.length > 0
   const acceptedCommercialForm = commercialForms.find(m => m.form?.status === 'accepted')
   const pendingCommercialForm = commercialForms.find(m => m.form?.status === 'pending')
@@ -75,10 +59,14 @@ export default function MessageInput({
   const projectSubmitted = acceptedCommercialForm?.form?.project_submitted
 
   // Determine if freelancer can send commercial forms
-  // Can send if: has accepted proposal AND no ACCEPTED commercial form exists
   const canSendCommercialForm = isCurrentUserFreelancer && 
     acceptedProposal && 
-    !acceptedCommercialForm && // No accepted commercial form
+    !hasCommercialForm && 
+    !projectSubmitted
+
+  // Determine if freelancer can submit project
+  const canSubmitProject = isCurrentUserFreelancer && 
+    acceptedCommercialForm && 
     !projectSubmitted
 
   // Determine conversation state
@@ -99,37 +87,18 @@ export default function MessageInput({
       }
       if (pendingCommercialForm) return 'commercial_sent'
       if (projectSubmitted) return 'project_completed'
-      return 'active' // Can always be active after proposal accepted
+      return 'active'
     }
   }
 
   const conversationState = getConversationState()
 
-  // Debug logging for submit project button
-  console.log('Submit Project Button Debug:', {
-    isCurrentUserFreelancer,
-    hasAcceptedCommercialForm: !!acceptedCommercialForm,
-    acceptedCommercialFormId: acceptedCommercialForm?.form?.id,
-    projectSubmitted,
-    shouldShowSubmitButton: isCurrentUserFreelancer && acceptedCommercialForm && !projectSubmitted,
-    canSendCommercialForm,
-    commercialFormsCount: commercialForms.length,
-    commercialForms: commercialForms.map(f => ({ 
-      id: f.form?.id, 
-      status: f.form?.status,
-      form_type: f.form?.form_type 
-    }))
-  })
-
   // Determine if messages can be sent
   const canSendMessage = () => {
-    // Both parties can send messages after proposal is accepted
     if (acceptedProposal) {
-      // If there's a pending commercial form, only freelancer can send messages
       if (pendingCommercialForm) {
         return isCurrentUserFreelancer
       }
-      // Otherwise both can send messages
       return true
     }
     return false
@@ -253,12 +222,199 @@ export default function MessageInput({
   }
 
   if (conversationState === 'project_completed') {
+    // Calculate days since project submission
+    const submittedAt = acceptedCommercialForm?.form?.project_submitted_at
+    const daysSinceSubmission = submittedAt 
+      ? Math.floor((Date.now() - new Date(submittedAt).getTime()) / (1000 * 60 * 60 * 24))
+      : 0
+    const daysRemaining = Math.max(0, 3 - daysSinceSubmission)
+
     return (
-      <div className="p-4 border-t bg-green-50">
-        <div className="text-center text-green-700">
-          <p className="text-sm">Project has been completed and delivered ✅</p>
+      <form onSubmit={handleSubmit} className="p-4 border-t">
+        {/* Project completed banner */}
+        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <div>
+              <p className="text-sm font-medium text-green-800">
+                Project has been delivered ✅
+              </p>
+              {daysRemaining > 0 ? (
+                <p className="text-xs text-green-600 mt-1">
+                  Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
+                </p>
+              ) : (
+                <p className="text-xs text-red-600 mt-1">
+                  Conversation is closed
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+
+        {selectedFile && daysRemaining > 0 && (
+          <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
+            <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedFile(null)}
+            >
+              Remove
+            </Button>
+          </div>
+        )}
+        
+        <div className="flex items-end gap-2">
+          <div className="flex-1 relative">
+            <Textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={daysRemaining > 0 ? "Type a message..." : "Conversation is closed"}
+              disabled={sending || daysRemaining === 0}
+              className="resize-none pr-10 min-h-[44px] max-h-32"
+              rows={1}
+            />
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelect}
+            accept="image/*,.pdf,.doc,.docx,.txt"
+          />
+
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={daysRemaining === 0}
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
+
+          <Button
+            type="submit"
+            size="icon"
+            disabled={!message.trim() || sending || daysRemaining === 0}
+            className="bg-[#00D37F] hover:bg-[#00c070]"
+          >
+            {sending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </form>
+    )
+  }
+
+  // Show special message for freelancer when commercial form is accepted
+  if (isCurrentUserFreelancer && acceptedCommercialForm && !projectSubmitted) {
+    return (
+      <>
+        <form onSubmit={handleSubmit} className="p-4 border-t">
+          {/* Info banner */}
+          <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-blue-800">
+                Commercial form accepted!
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                You can now deliver the project files
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={() => setShowProjectSubmission(true)}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              size="sm"
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              Submit Project
+            </Button>
+          </div>
+
+          {selectedFile && (
+            <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
+              <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedFile(null)}
+              >
+                Remove
+              </Button>
+            </div>
+          )}
+          
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                disabled={sending}
+                className="resize-none pr-10 min-h-[44px] max-h-32"
+                rows={1}
+              />
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+            />
+
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!message.trim() || sending}
+              className="bg-[#00D37F] hover:bg-[#00c070]"
+            >
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+        </form>
+
+        {/* Project Submission Dialog */}
+        {acceptedCommercialForm && (
+          <ProjectSubmission
+            formId={acceptedCommercialForm.form.id}
+            conversationId={conversation.id}
+            receiverId={conversation.participant.id}
+            senderId={currentUserId!}
+            open={showProjectSubmission}
+            onOpenChange={setShowProjectSubmission}
+            onSubmitted={() => {
+              setShowProjectSubmission(false)
+              onFormSent?.()
+            }}
+          />
+        )}
+      </>
     )
   }
 
@@ -311,7 +467,7 @@ export default function MessageInput({
             <Paperclip className="h-4 w-4" />
           </Button>
 
-          {/* Show commercial form button ONLY if no commercial forms exist at all */}
+          {/* Show commercial form button ONLY if conditions are met */}
           {canSendCommercialForm && (
             <OfferForm
               conversationId={conversation.id}
@@ -325,23 +481,6 @@ export default function MessageInput({
                 </Button>
               }
             />
-          )}
-
-          {/* Show project submission button when commercial form is accepted (replaces commercial form button) */}
-          {isCurrentUserFreelancer && acceptedCommercialForm && !projectSubmitted && (
-            <Button
-              type="button"
-              size="icon"
-              variant="ghost"
-              onClick={() => {
-                console.log('Project submission button clicked')
-                setShowProjectSubmission(true)
-              }}
-              title="Submit Project"
-              className="text-green-600 hover:text-green-700 hover:bg-green-50"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
           )}
 
           <Button
@@ -358,22 +497,6 @@ export default function MessageInput({
           </Button>
         </div>
       </form>
-
-      {/* Project Submission Dialog */}
-      {acceptedCommercialForm && (
-        <ProjectSubmission
-          formId={acceptedCommercialForm.form.id}
-          conversationId={conversation.id}
-          receiverId={conversation.participant.id}
-          senderId={currentUserId!}
-          open={showProjectSubmission}
-          onOpenChange={setShowProjectSubmission}
-          onSubmitted={() => {
-            setShowProjectSubmission(false)
-            onFormSent?.()
-          }}
-        />
-      )}
     </>
   )
 }

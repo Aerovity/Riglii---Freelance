@@ -12,8 +12,9 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { CheckCircle, XCircle, Clock, DollarSign, FileText, Receipt } from "lucide-react"
+import { CheckCircle, XCircle, Clock, DollarSign, FileText, Receipt, Package } from "lucide-react"
 import type { Form } from "../../types"
+import ProjectDeliveryDisplay from "./ProjectDeliveryDisplay"
 
 interface FormDisplayProps {
   form: Form
@@ -304,9 +305,9 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
           {showProjectStatus && (
             <div className="pt-3 border-t">
               {form.project_submitted ? (
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle className="h-4 w-4" />
-                  <p className="text-sm font-medium">
+                <div className="text-green-600">
+                  <p className="text-sm font-medium flex items-center gap-2">
+                    <Package className="h-4 w-4" />
                     Project delivered on {new Date(form.project_submitted_at!).toLocaleDateString()}
                   </p>
                 </div>
@@ -354,6 +355,11 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
           )}
         </CardContent>
       </Card>
+
+      {/* Show project delivery details if project is submitted */}
+      {form.project_submitted && (
+        <ProjectDeliveryDisplay form={form} currentUserId={currentUserId} />
+      )}
 
       {/* Digital Signature Dialog */}
       <Dialog open={showSignature} onOpenChange={setShowSignature}>

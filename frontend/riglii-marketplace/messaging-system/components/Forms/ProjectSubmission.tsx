@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Upload, Send, Loader2, File, X, CheckCircle } from 'lucide-react'
+import { Upload, Send, Loader2, File, X, CheckCircle } from "lucide-react"
 import type { ProjectFile } from "../../types"
 
 interface ProjectSubmissionProps {
@@ -51,30 +51,25 @@ export default function ProjectSubmission({
   }
 
   const handleSubmit = async () => {
-    if (loading) return; // Prevent double submission
-  
     setLoading(true)
-    console.log('Starting project submission...')
-    
     try {
       const projectFiles: ProjectFile[] = []
       
       // Upload all files to storage
       if (files.length > 0) {
-        console.log(`Uploading ${files.length} files...`)
         for (const file of files) {
+          const fileExt = file.name.split('.').pop()
           const fileName = `${senderId}/${formId}_${Date.now()}_${file.name}`
           
+          // Use project_submissions (with underscore) to match your bucket name
           const { error: uploadError, data: uploadData } = await supabase.storage
-            .from('project-submissions')
+            .from('project_submissions')
             .upload(fileName, file)
 
           if (uploadError) {
             console.error('Upload error:', uploadError)
             throw uploadError
           }
-          
-          console.log('File uploaded successfully:', fileName)
           
           projectFiles.push({
             file_name: file.name,
@@ -107,19 +102,20 @@ export default function ProjectSubmission({
         project_submitted_at: new Date().toISOString(),
       }
 
+      // Add project URL if provided
       if (projectUrl.trim()) {
         updateData.project_submission_url = projectUrl.trim()
       }
 
+      // Add files if uploaded
       if (projectFiles.length > 0) {
         updateData.project_files = projectFiles
       }
 
+      // Add notes if provided
       if (notes.trim()) {
         updateData.project_notes = notes.trim()
       }
-
-      console.log('Updating form with data:', updateData)
 
       const { error: formError } = await supabase
         .from("forms")
@@ -142,8 +138,11 @@ export default function ProjectSubmission({
       if (projectUrl.trim()) {
         notificationMessage += `\n\nProject link: ${projectUrl.trim()}`
       }
+      
+      // Add 3-day closure notice
+      notificationMessage += "\n\n⏰ The conversation will automatically close in 3 days."
 
-      // Send notification message
+      // Send notification message with form_id reference
       const { error: messageError } = await supabase
         .from("messages")
         .insert({
@@ -151,15 +150,14 @@ export default function ProjectSubmission({
           sender_id: senderId,
           receiver_id: receiverId,
           content: notificationMessage,
-          message_type: "text"
+          message_type: "text",
+          form_id: formId  // Link to the form for project data
         })
 
       if (messageError) {
         console.error('Message error:', messageError)
         throw messageError
       }
-
-      console.log('Project submitted successfully!')
 
       // Success! Show toast and close dialog
       toast({
@@ -193,15 +191,7 @@ export default function ProjectSubmission({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="max-w-lg"
-        style={{
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
@@ -209,7 +199,7 @@ export default function ProjectSubmission({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 space-y-4 py-4">
+        <div className="space-y-4">
           {/* File Upload Section */}
           <div className="space-y-2">
             <Label>Project Files</Label>
@@ -293,40 +283,21 @@ export default function ProjectSubmission({
               disabled={loading}
             />
           </div>
-        </div>
 
-        {/* Fixed Footer with Buttons - Always Visible */}
-        <div 
-          className="border-t pt-4 mt-auto"
-          style={{
-            position: 'sticky',
-            bottom: 0,
-            backgroundColor: 'white',
-            padding: '16px 0',
-            marginTop: '16px'
-          }}
-        >
-          <div className="flex justify-between gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                onOpenChange(false)
-                setFiles([])
-                setProjectUrl('')
-                setNotes('')
-              }}
-              disabled={loading}
-              className="min-w-[100px]"
-            >
-              Cancel
-            </Button>
+          {/* Buttons */}
+          <div className="space-y-2 pt-4">
+            {/* Warning message */}
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800 font-medium">⚠️ Important</p>
+              <p className="text-xs text-amber-700 mt-1">
+                You can only submit the project once. The conversation will automatically close 3 days after submission.
+              </p>
+            </div>
             
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading}
-              className="min-w-[140px] bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+            <Button 
+              onClick={handleSubmit} 
+              disabled={loading} 
+              className="w-full bg-[#00D37F] hover:bg-[#00c070] text-white"
             >
               {loading ? (
                 <>
@@ -339,6 +310,21 @@ export default function ProjectSubmission({
                   Submit Project
                 </>
               )}
+            </Button>
+            
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                onOpenChange(false)
+                setFiles([])
+                setProjectUrl('')
+                setNotes('')
+              }}
+              disabled={loading}
+              className="w-full"
+            >
+              Cancel
             </Button>
           </div>
         </div>

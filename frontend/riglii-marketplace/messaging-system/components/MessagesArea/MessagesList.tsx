@@ -1,7 +1,7 @@
 import { useEffect, useRef, useMemo } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { Message } from "../../types"
-import MessageItem from "./MessageItem"
+import MessageDisplay from "./MessageDisplay"
 
 interface MessagesListProps {
   messages: Message[]
@@ -51,11 +51,12 @@ export default function MessagesList({ messages, currentUserId, onFormUpdate }: 
     <ScrollArea className="flex-1 px-4 py-4 bg-white">
       <div className="space-y-4">
         {filteredMessages.map((message) => (
-          <MessageItem
+          <MessageDisplay
             key={message.id}
             message={message}
+            isOwn={message.sender_id === currentUserId}
             currentUserId={currentUserId}
-            onFormUpdate={onFormUpdate}
+            allMessages={filteredMessages}
           />
         ))}
         <div ref={messagesEndRef} />

@@ -2,19 +2,21 @@ import { useState, useEffect, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import type { Message } from "../types"
-import { POLLING_INTERVAL } from "../constants"
 
 export const useMessages = (conversationId: string | null, userId: string) => {
   const [messages, setMessages] = useState<Message[]>([])
   const [sending, setSending] = useState(false)
-  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [loading, setLoading] = useState(false)
   const supabase = createClient()
   const { toast } = useToast()
+  const senderCacheRef = useRef(new Map<string, any>())
 
   const fetchMessages = async (silent: boolean = false) => {
     if (!conversationId) return
 
     try {
+      if (!silent) setLoading(true)
+      
       const { data, error } = await supabase
         .from('messages')
         .select(`
@@ -29,7 +31,13 @@ export const useMessages = (conversationId: string | null, userId: string) => {
             sender_id,
             receiver_id,
             created_at,
-            responded_at
+            responded_at,
+            form_type,
+            project_submitted,
+            project_submitted_at,
+            project_files,
+            project_submission_url,
+            project_notes
           )
         `)
         .eq('conversation_id', conversationId)
@@ -37,58 +45,66 @@ export const useMessages = (conversationId: string | null, userId: string) => {
 
       if (error) throw error
       
-      // Process messages to include sender info
-      const processedMessages = await Promise.all(
-        (data || []).map(async (msg) => {
-          const { data: senderData } = await supabase
-            .from('users')
-            .select(`
-              email,
-              freelancer_profiles (
-                display_name,
-                first_name,
-                last_name
-              )
-            `)
-            .eq('id', msg.sender_id)
-            .single()
+      // Get unique sender IDs not in cache
+      const senderIds = new Set<string>()
+      data?.forEach(msg => {
+        if (!senderCacheRef.current.has(msg.sender_id)) {
+          senderIds.add(msg.sender_id)
+        }
+      })
 
-          // Try to get avatar from auth metadata
-          const { data: { user: authUser } } = await supabase.auth.getUser()
-          let avatarUrl = null
-          
-          if (msg.sender_id === userId) {
-            avatarUrl = authUser?.user_metadata?.avatar_url || null
-          }
-          
-          const senderName = senderData?.freelancer_profiles?.[0]?.display_name ||
-                           `${senderData?.freelancer_profiles?.[0]?.first_name || ''} ${senderData?.freelancer_profiles?.[0]?.last_name || ''}`.trim() ||
-                           (msg.sender_id === userId ? authUser?.user_metadata?.full_name : null) ||
-                           senderData?.email?.split('@')[0] || 
-                           'Unknown'
+      // Fetch sender info only for new senders
+      if (senderIds.size > 0) {
+        const { data: sendersData } = await supabase
+          .from('users')
+          .select(`
+            id,
+            email,
+            freelancer_profiles (
+              display_name,
+              first_name,
+              last_name,
+              profile_picture_url
+            )
+          `)
+          .in('id', Array.from(senderIds))
 
-          return {
-            ...msg,
-            sender: {
-              full_name: senderName,
-              avatar_url: avatarUrl
-            }
-          }
+        sendersData?.forEach(sender => {
+          const profile = sender.freelancer_profiles?.[0]
+          const fullName = profile?.display_name ||
+                         `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim() ||
+                         sender.email?.split('@')[0] || 
+                         'Unknown'
+          
+          senderCacheRef.current.set(sender.id, {
+            full_name: fullName,
+            avatar_url: profile?.profile_picture_url || null
+          })
         })
-      )
+      }
+
+      // Process messages with cached sender info
+      const processedMessages = (data || []).map(msg => ({
+        ...msg,
+        sender: senderCacheRef.current.get(msg.sender_id) || {
+          full_name: msg.sender_id === userId ? 'You' : 'Unknown',
+          avatar_url: null
+        }
+      }))
 
       setMessages(processedMessages)
       
-      // Mark messages as read
+      // Mark messages as read in background
       const unreadMessageIds = data
         ?.filter(msg => msg.receiver_id === userId && !msg.is_read)
         .map(msg => msg.id) || []
       
       if (unreadMessageIds.length > 0) {
-        await supabase
+        supabase
           .from('messages')
           .update({ is_read: true })
           .in('id', unreadMessageIds)
+          .then(() => {})
       }
     } catch (error) {
       if (!silent) {
@@ -99,6 +115,8 @@ export const useMessages = (conversationId: string | null, userId: string) => {
           variant: "destructive",
         })
       }
+    } finally {
+      if (!silent) setLoading(false)
     }
   }
 
@@ -111,11 +129,33 @@ export const useMessages = (conversationId: string | null, userId: string) => {
     if (!conversationId) return
 
     setSending(true)
+    
+    // Optimistically add the message
+    const tempId = `temp-${Date.now()}`
+    const optimisticMessage: Message = {
+      id: tempId,
+      content: content || (attachmentUrl ? `Sent ${attachmentType === 'image' ? 'an image' : 'a file'}` : ''),
+      sender_id: userId,
+      receiver_id: receiverId,
+      conversation_id: conversationId,
+      created_at: new Date().toISOString(),
+      attachment_url: attachmentUrl,
+      attachment_type: attachmentType,
+      message_type: 'text',
+      is_read: false,
+      sender: {
+        full_name: 'You',
+        avatar_url: null
+      }
+    }
+    
+    setMessages(prev => [...prev, optimisticMessage])
+
     try {
       const { data, error } = await supabase
         .from('messages')
         .insert({
-          content: content || (attachmentUrl ? `Sent ${attachmentType === 'image' ? 'an image' : 'a file'}` : ''),
+          content: optimisticMessage.content,
           sender_id: userId,
           receiver_id: receiverId,
           conversation_id: conversationId,
@@ -128,18 +168,16 @@ export const useMessages = (conversationId: string | null, userId: string) => {
 
       if (error) throw error
 
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      setMessages((prev) => [...prev, {
-        ...data,
-        sender: {
-          full_name: user?.user_metadata?.full_name || 'You',
-          avatar_url: user?.user_metadata?.avatar_url || null,
-        }
-      }])
+      // Replace optimistic message with real one
+      setMessages(prev => prev.map(msg => 
+        msg.id === tempId ? { ...data, sender: optimisticMessage.sender } : msg
+      ))
       
       return { success: true }
     } catch (error) {
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId))
+      
       console.error('Error sending message:', error)
       toast({
         title: "Error",
@@ -152,33 +190,42 @@ export const useMessages = (conversationId: string | null, userId: string) => {
     }
   }
 
-  // Set up polling
-  useEffect(() => {
-    if (pollingIntervalRef.current) {
-      clearInterval(pollingIntervalRef.current)
-      pollingIntervalRef.current = null
-    }
+  const addNewMessage = (message: Message) => {
+    setMessages(prev => {
+      // Check if message already exists
+      if (prev.some(m => m.id === message.id)) {
+        return prev
+      }
+      
+      // Add sender info from cache or default
+      const messageWithSender = {
+        ...message,
+        sender: senderCacheRef.current.get(message.sender_id) || {
+          full_name: message.sender_id === userId ? 'You' : 'Unknown',
+          avatar_url: null
+        }
+      }
+      
+      return [...prev, messageWithSender]
+    })
+  }
 
+  const refetch = () => fetchMessages(false)
+
+  useEffect(() => {
     if (conversationId) {
       fetchMessages()
-      
-      pollingIntervalRef.current = setInterval(() => {
-        fetchMessages(true)
-      }, POLLING_INTERVAL)
-    }
-
-    return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current)
-        pollingIntervalRef.current = null
-      }
+    } else {
+      setMessages([])
     }
   }, [conversationId])
 
   return {
     messages,
     sending,
+    loading,
     sendMessage,
-    refetch: fetchMessages
+    refetch,
+    addNewMessage
   }
 }
