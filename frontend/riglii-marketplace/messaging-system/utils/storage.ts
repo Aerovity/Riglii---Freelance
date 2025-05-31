@@ -50,3 +50,30 @@ export const uploadAttachment = async (file: File, userId: string): Promise<{
     }
   }
 }
+// Add to storage.ts
+export const downloadProjectFile = async (filePath: string, fileName: string) => {
+  const supabase = createClient()
+  
+  try {
+    const { data, error } = await supabase.storage
+      .from('project-submissions')
+      .download(filePath)
+    
+    if (error) throw error
+    
+    // Create a download link
+    const url = URL.createObjectURL(data)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    
+    return { success: true }
+  } catch (error) {
+    console.error('Error downloading file:', error)
+    return { success: false, error }
+  }
+}

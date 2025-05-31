@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { FileText, Send, Loader2, DollarSign, Clock } from "lucide-react"
+import { FileText, Send, Loader2, DollarSign, Clock, Receipt } from "lucide-react"
 import type { FormData } from "../../types"
 import { validateFormData } from "../../utils/validations"
 
@@ -20,6 +20,7 @@ interface OfferFormProps {
   conversationId: string
   receiverId: string
   senderId: string
+  isFreelancer: boolean // New prop
   onFormSent?: () => void
   trigger?: React.ReactNode
 }
@@ -28,6 +29,7 @@ export default function OfferForm({
   conversationId,
   receiverId,
   senderId,
+  isFreelancer,
   onFormSent,
   trigger
 }: OfferFormProps) {
@@ -42,6 +44,10 @@ export default function OfferForm({
 
   const supabase = createClient()
   const { toast } = useToast()
+  
+  const formType = isFreelancer ? 'commercial' : 'proposal'
+  const formTitle = isFreelancer ? 'Create Commercial Form' : 'Create Project Proposal'
+  const formIcon = isFreelancer ? Receipt : FileText
 
   const handleSubmit = async () => {
     const validation = validateFormData(formData)
@@ -67,6 +73,7 @@ export default function OfferForm({
           price: Number.parseFloat(formData.price),
           time_estimate: formData.timeEstimate.trim(),
           status: "pending",
+          form_type: formType, // Set form type
         })
         .select()
         .single()
@@ -75,7 +82,7 @@ export default function OfferForm({
 
       toast({
         title: "Form Sent",
-        description: "Your project form has been sent successfully",
+        description: `Your ${formType} form has been sent successfully`,
       })
 
       // Reset form
@@ -100,10 +107,12 @@ export default function OfferForm({
     }
   }
 
+  const FormIcon = formIcon
+
   const defaultTrigger = (
     <Button variant="outline" className="gap-2">
-      <FileText className="h-4 w-4" />
-      Send Project Form
+      <FormIcon className="h-4 w-4" />
+      Send {isFreelancer ? 'Commercial Form' : 'Project Form'}
     </Button>
   )
 
@@ -113,17 +122,19 @@ export default function OfferForm({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Create Project Form
+            <FormIcon className="h-5 w-5" />
+            {formTitle}
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Project Title</Label>
+            <Label htmlFor="title">
+              {isFreelancer ? 'Service Title' : 'Project Title'}
+            </Label>
             <Input
               id="title"
-              placeholder="e.g., Logo Design for Tech Startup"
+              placeholder={isFreelancer ? "e.g., Logo Design Package" : "e.g., Logo Design for Tech Startup"}
               value={formData.title}
               onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
               disabled={loading}
@@ -132,7 +143,9 @@ export default function OfferForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="price">Price ($)</Label>
+              <Label htmlFor="price">
+                {isFreelancer ? 'Total Price (DZD)' : 'Budget (DZD)'}
+              </Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -150,7 +163,9 @@ export default function OfferForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="timeEstimate">Time Estimate</Label>
+              <Label htmlFor="timeEstimate">
+                {isFreelancer ? 'Delivery Time' : 'Time Estimate'}
+              </Label>
               <div className="relative">
                 <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
@@ -166,10 +181,14 @@ export default function OfferForm({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Project Description</Label>
+            <Label htmlFor="description">
+              {isFreelancer ? 'Service Description' : 'Project Description'}
+            </Label>
             <Textarea
               id="description"
-              placeholder="Describe the project requirements, deliverables, and any specific details..."
+              placeholder={isFreelancer 
+                ? "Describe what's included in this service package..." 
+                : "Describe the project requirements, deliverables, and any specific details..."}
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               rows={4}

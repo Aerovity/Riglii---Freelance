@@ -45,11 +45,7 @@ export default function MessagesList({ messages, currentUserId, onFormUpdate }: 
     })
   }, [messages])
 
-  console.log('MessagesList Debug:', {
-    totalMessages: messages.length,
-    filteredMessages: filteredMessages.length,
-    formMessages: messages.filter(m => m.message_type === 'form').length
-  })
+ 
 
   return (
     <ScrollArea className="flex-1 px-4 py-4 bg-white">

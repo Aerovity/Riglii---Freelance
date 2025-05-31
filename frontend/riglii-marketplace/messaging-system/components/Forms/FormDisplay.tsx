@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
@@ -13,7 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { CheckCircle, XCircle, Clock, DollarSign, FileText } from "lucide-react"
+import { CheckCircle, XCircle, Clock, DollarSign, FileText, Receipt } from "lucide-react"
 import type { Form } from "../../types"
 
 interface FormDisplayProps {
@@ -38,6 +37,31 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
   const isReceiver = form.receiver_id === currentUserId
   const isSender = form.sender_id === currentUserId
   const canRespond = isReceiver && form.status === "pending"
+
+  // Fetch form_type if it's missing
+  const [realFormType, setRealFormType] = useState(form.form_type)
+  
+  // If form_type is missing, fetch it from the database
+  useState(() => {
+    if (!form.form_type && form.id) {
+      supabase
+        .from('forms')
+        .select('form_type')
+        .eq('id', form.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            console.log('Fetched form_type:', data.form_type)
+            setRealFormType(data.form_type)
+          }
+        })
+    }
+  })
+
+  // Determine form type icon and label
+  const isCommercialForm = realFormType === 'commercial'
+  const FormIcon = isCommercialForm ? Receipt : FileText
+  const formTypeLabel = isCommercialForm ? 'Commercial Form' : 'Project Proposal'
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return
@@ -114,21 +138,26 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
 
       if (formError) throw formError
 
+      // Customize message based on form type
+      const acceptanceMessage = isCommercialForm 
+        ? "✅ Commercial form accepted. The freelancer can now deliver the project."
+        : "✅ Proposal accepted. You can now exchange messages."
+
       const { error: messageError } = await supabase
         .from("messages")
         .insert({
           conversation_id: form.conversation_id,
           sender_id: currentUserId,
           receiver_id: form.sender_id,
-          content: "✅ Proposal accepted. You can now exchange messages.",
+          content: acceptanceMessage,
           message_type: "text"
         })
 
       if (messageError) throw messageError
 
       toast({
-        title: "Proposal Accepted",
-        description: "You have accepted the project proposal.",
+        title: `${formTypeLabel} Accepted`,
+        description: `You have accepted the ${isCommercialForm ? 'commercial form' : 'project proposal'}.`,
       })
 
       setShowSignature(false)
@@ -137,7 +166,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
       console.error("Error accepting form:", error)
       toast({
         title: "Error",
-        description: "Failed to accept the proposal. Please try again.",
+        description: "Failed to accept the form. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -158,21 +187,25 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
 
       if (formError) throw formError
 
+      const refusalMessage = isCommercialForm
+        ? `❌ Commercial form refused${refuseReason ? `: ${refuseReason}` : ""}.`
+        : `❌ Proposal refused${refuseReason ? `: ${refuseReason}` : ""}.`
+
       const { error: messageError } = await supabase
         .from("messages")
         .insert({
           conversation_id: form.conversation_id,
           sender_id: currentUserId,
           receiver_id: form.sender_id,
-          content: `❌ Proposal refused${refuseReason ? `: ${refuseReason}` : ""}.`,
+          content: refusalMessage,
           message_type: "text"
         })
 
       if (messageError) throw messageError
 
       toast({
-        title: "Proposal Refused",
-        description: "You have refused the project proposal.",
+        title: `${formTypeLabel} Refused`,
+        description: `You have refused the ${isCommercialForm ? 'commercial form' : 'project proposal'}.`,
       })
 
       setShowRefuseDialog(false)
@@ -182,7 +215,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
       console.error("Error refusing form:", error)
       toast({
         title: "Error",
-        description: "Failed to refuse the proposal. Please try again.",
+        description: "Failed to refuse the form. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -216,6 +249,9 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
     }
   }
 
+  // Show project submission status for commercial forms
+  const showProjectStatus = isCommercialForm && form.status === 'accepted'
+
   return (
     <>
       <Card className="max-w-lg mx-auto my-4">
@@ -223,11 +259,11 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
           <div className="flex items-start justify-between">
             <div className="space-y-1">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-gray-500" />
+                <FormIcon className="h-5 w-5 text-gray-500" />
                 {form.title}
               </h3>
               <p className="text-sm text-muted-foreground">
-                Project Proposal
+                {formTypeLabel}
               </p>
             </div>
             {getStatusBadge()}
@@ -240,14 +276,18 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
 
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Budget</p>
+              <p className="text-sm text-muted-foreground">
+                {isCommercialForm ? 'Total Price' : 'Budget'}
+              </p>
               <p className="font-semibold flex items-center gap-1">
                 <DollarSign className="h-4 w-4" />
                 {form.price.toLocaleString()}
               </p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Timeline</p>
+              <p className="text-sm text-muted-foreground">
+                {isCommercialForm ? 'Delivery Time' : 'Timeline'}
+              </p>
               <p className="font-semibold">{form.time_estimate}</p>
             </div>
           </div>
@@ -258,6 +298,23 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
                 {form.status === "accepted" ? "Accepted" : "Refused"} on{" "}
                 {new Date(form.responded_at).toLocaleDateString()}
               </p>
+            </div>
+          )}
+
+          {showProjectStatus && (
+            <div className="pt-3 border-t">
+              {form.project_submitted ? (
+                <div className="flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  <p className="text-sm font-medium">
+                    Project delivered on {new Date(form.project_submitted_at!).toLocaleDateString()}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-yellow-600">
+                  <p className="text-sm">⏳ Awaiting project delivery</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -289,7 +346,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
               {isSender && (
                 <div className="text-center mt-3">
                   <p className="text-sm text-yellow-600">
-                    ⏳ Waiting for response from freelancer
+                    ⏳ Waiting for response from {isCommercialForm ? 'client' : 'freelancer'}
                   </p>
                 </div>
               )}
@@ -304,7 +361,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
           <DialogHeader>
             <DialogTitle>Digital Signature Required</DialogTitle>
             <DialogDescription>
-              Please sign below to accept this project proposal.
+              Please sign below to accept this {isCommercialForm ? 'commercial form' : 'project proposal'}.
             </DialogDescription>
           </DialogHeader>
           
@@ -356,7 +413,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
       <Dialog open={showRefuseDialog} onOpenChange={setShowRefuseDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Refuse Proposal</DialogTitle>
+            <DialogTitle>Refuse {formTypeLabel}</DialogTitle>
             <DialogDescription>
               Please provide a reason for refusing (optional).
             </DialogDescription>
@@ -384,7 +441,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
                 variant="destructive"
                 className="flex-1"
               >
-                {updating ? "Refusing..." : "Refuse Proposal"}
+                {updating ? "Refusing..." : `Refuse ${formTypeLabel}`}
               </Button>
             </div>
           </div>

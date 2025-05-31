@@ -17,6 +17,7 @@ export interface PublicUser {
 }
 
 // Form/Proposal type
+// Update Form interface
 export interface Form {
   id: string;
   conversation_id: string;
@@ -27,10 +28,26 @@ export interface Form {
   price: number;
   time_estimate: string;
   status: 'pending' | 'accepted' | 'refused' | 'cancelled';
+  form_type: 'proposal' | 'commercial';
+  project_submitted?: boolean;
+  project_submission_url?: string;
+  project_submitted_at?: Date | string;
+  project_files?: ProjectFile[]; // New field
+  project_notes?: string; // New field
   created_at: Date | string;
   updated_at: Date | string;
   responded_at?: Date | string;
   digital_signature?: string;
+}
+
+// New interface for project files
+export interface ProjectFile {
+  id?: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  file_type: string;
+  uploaded_at?: Date | string;
 }
 
 // Form data for creating new forms
