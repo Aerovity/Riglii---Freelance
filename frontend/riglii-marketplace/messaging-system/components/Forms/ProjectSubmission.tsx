@@ -50,141 +50,251 @@ export default function ProjectSubmission({
     setFiles(prev => prev.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = async () => {
-    setLoading(true)
-    try {
-      const projectFiles: ProjectFile[] = []
-      
-      // Upload all files to storage
-      if (files.length > 0) {
-        for (const file of files) {
-          const fileExt = file.name.split('.').pop()
-          const fileName = `${senderId}/${formId}_${Date.now()}_${file.name}`
-          
-          // Use project_submissions (with underscore) to match your bucket name
-          const { error: uploadError, data: uploadData } = await supabase.storage
-            .from('project_submissions')
-            .upload(fileName, file)
+  // Replace the handleSubmit function with this authentication-aware version
 
-          if (uploadError) {
-            console.error('Upload error:', uploadError)
-            throw uploadError
-          }
-          
-          projectFiles.push({
+const handleSubmit = async () => {
+  setLoading(true)
+  try {
+    console.log('=== PROJECT SUBMISSION AUTH DEBUG START ===');
+
+    // Step 1: Check authentication status
+    console.log('Step 1: Checking authentication...');
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    console.log('Auth check result:', { user: user?.id, authError });
+    
+    if (authError) {
+      console.error('Authentication error:', authError);
+      throw new Error('Authentication failed');
+    }
+    
+    if (!user) {
+      console.error('No authenticated user');
+      throw new Error('You must be logged in to submit a project');
+    }
+
+    console.log('✅ User authenticated:', user.id);
+    console.log('Sender ID from props:', senderId);
+    
+    if (user.id !== senderId) {
+      console.error('User ID mismatch:', { userId: user.id, senderId });
+      throw new Error('User authentication mismatch');
+    }
+
+    // Step 2: Test database connection with auth context
+    console.log('Step 2: Testing database connection...');
+    const { data: testQuery, error: testError } = await supabase
+      .rpc('auth.uid') // This should return the current user ID
+
+    console.log('Database auth test:', { testQuery, testError });
+
+    // Step 3: Find the form to update
+    console.log('Step 3: Finding target form...');
+    console.log('Query parameters:', {
+      conversationId,
+      senderId: user.id, // Use the authenticated user ID
+      status: 'accepted'
+    });
+
+    const { data: forms, error: formsError } = await supabase
+      .from("forms")
+      .select("*")
+      .eq("conversation_id", conversationId)
+      .eq("sender_id", user.id) // Use authenticated user ID
+      .eq("status", "accepted")
+
+    console.log('Forms query result:', { forms, formsError });
+
+    if (formsError) {
+      console.error('Error finding forms:', formsError);
+      throw formsError;
+    }
+
+    if (!forms || forms.length === 0) {
+      console.log('No forms found, checking all forms in conversation...');
+      
+      // Debug: Check all forms in this conversation
+      const { data: allForms, error: allFormsError } = await supabase
+        .from("forms")
+        .select("*")
+        .eq("conversation_id", conversationId)
+
+      console.log('All forms in conversation:', { allForms, allFormsError });
+      
+      throw new Error('No accepted forms found in this conversation');
+    }
+
+    // Find commercial form first, fallback to any accepted form
+    let targetForm = forms.find(form => form.form_type === 'commercial') || forms[0];
+    console.log('Target form selected:', targetForm);
+
+    if (targetForm.project_submitted) {
+      throw new Error('Project has already been submitted for this form');
+    }
+
+    // Step 4: Attempt the update with explicit auth context
+    console.log('Step 4: Attempting form update...');
+    
+    const updateData = {
+      project_submitted: true,
+      project_submitted_at: new Date().toISOString(),
+    };
+
+    if (projectUrl.trim()) {
+      updateData.project_submission_url = projectUrl.trim();
+    }
+
+    if (notes.trim()) {
+      updateData.project_notes = notes.trim();
+    }
+
+    console.log('Update data:', updateData);
+    console.log('Updating form ID:', targetForm.id);
+
+    // Use the authenticated user's session
+    const { error: updateError, data: updateResult } = await supabase
+      .from("forms")
+      .update(updateData)
+      .eq("id", targetForm.id)
+      .eq("sender_id", user.id) // Double-check sender ownership
+      .select()
+
+    console.log('Update result:', { updateError, updateResult });
+
+    if (updateError) {
+      console.error('Update error details:', {
+        message: updateError.message,
+        code: updateError.code,
+        details: updateError.details,
+        hint: updateError.hint
+      });
+      throw updateError;
+    }
+
+    if (!updateResult || updateResult.length === 0) {
+      console.error('No rows updated - possible permission issue');
+      throw new Error('Failed to update form. Check permissions.');
+    }
+
+    console.log('✅ Form updated successfully!');
+
+    // Step 5: Verify the update
+    const { data: verifyForm, error: verifyError } = await supabase
+      .from("forms")
+      .select("project_submitted, project_submitted_at")
+      .eq("id", targetForm.id)
+      .single()
+
+    console.log('Verification:', { verifyForm, verifyError });
+
+    // Handle file uploads if any
+    const projectFiles: ProjectFile[] = []
+    
+    if (files.length > 0) {
+      console.log('Processing file uploads...');
+      for (const file of files) {
+        const fileName = `${user.id}/${targetForm.id}_${Date.now()}_${file.name}`
+        
+        const { error: uploadError, data: uploadData } = await supabase.storage
+          .from('project_submissions')
+          .upload(fileName, file)
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw uploadError
+        }
+        
+        projectFiles.push({
+          file_name: file.name,
+          file_path: fileName,
+          file_size: file.size,
+          file_type: file.type
+        })
+
+        const { error: dbError } = await supabase
+          .from('project_files')
+          .insert({
+            form_id: targetForm.id,
             file_name: file.name,
             file_path: fileName,
             file_size: file.size,
             file_type: file.type
           })
 
-          // Also insert into project_files table
-          const { error: dbError } = await supabase
-            .from('project_files')
-            .insert({
-              form_id: formId,
-              file_name: file.name,
-              file_path: fileName,
-              file_size: file.size,
-              file_type: file.type
-            })
-
-          if (dbError) {
-            console.error('Database error:', dbError)
-            throw dbError
-          }
+        if (dbError) {
+          console.error('File DB error:', dbError)
+          throw dbError
         }
       }
 
-      // Update form with project submission
-      const updateData: any = {
-        project_submitted: true,
-        project_submitted_at: new Date().toISOString(),
-      }
-
-      // Add project URL if provided
-      if (projectUrl.trim()) {
-        updateData.project_submission_url = projectUrl.trim()
-      }
-
-      // Add files if uploaded
+      // Update form with files
       if (projectFiles.length > 0) {
-        updateData.project_files = projectFiles
+        const { error: fileUpdateError } = await supabase
+          .from("forms")
+          .update({ project_files: projectFiles })
+          .eq("id", targetForm.id)
+
+        if (fileUpdateError) {
+          console.error('File update error:', fileUpdateError)
+          throw fileUpdateError
+        }
       }
-
-      // Add notes if provided
-      if (notes.trim()) {
-        updateData.project_notes = notes.trim()
-      }
-
-      const { error: formError } = await supabase
-        .from("forms")
-        .update(updateData)
-        .eq("id", formId)
-
-      if (formError) {
-        console.error('Form update error:', formError)
-        throw formError
-      }
-
-      // Build notification message
-      let notificationMessage = "📦 Project delivered!"
-      if (files.length > 0) {
-        notificationMessage += ` (${files.length} file${files.length > 1 ? 's' : ''})`
-      }
-      if (notes.trim()) {
-        notificationMessage += `\n\nNotes: ${notes.trim()}`
-      }
-      if (projectUrl.trim()) {
-        notificationMessage += `\n\nProject link: ${projectUrl.trim()}`
-      }
-      
-      // Add 3-day closure notice
-      notificationMessage += "\n\n⏰ The conversation will automatically close in 3 days."
-
-      // Send notification message with form_id reference
-      const { error: messageError } = await supabase
-        .from("messages")
-        .insert({
-          conversation_id: conversationId,
-          sender_id: senderId,
-          receiver_id: receiverId,
-          content: notificationMessage,
-          message_type: "text",
-          form_id: formId  // Link to the form for project data
-        })
-
-      if (messageError) {
-        console.error('Message error:', messageError)
-        throw messageError
-      }
-
-      // Success! Show toast and close dialog
-      toast({
-        title: "Project Submitted Successfully! 🎉",
-        description: "Your project has been delivered to the client.",
-      })
-
-      // Reset form
-      setProjectUrl("")
-      setNotes("")
-      setFiles([])
-      
-      // Close dialog and trigger callback
-      onOpenChange(false)
-      onSubmitted()
-      
-    } catch (error: any) {
-      console.error("Error submitting project:", error)
-      toast({
-        title: "Submission Failed",
-        description: error.message || "Failed to submit project. Please try again.",
-        variant: "destructive",
-      })
-    } finally {
-      setLoading(false)
     }
+
+    // Send notification
+    let notificationMessage = "📦 Project delivered!"
+    if (files.length > 0) {
+      notificationMessage += ` (${files.length} file${files.length > 1 ? 's' : ''})`
+    }
+    if (notes.trim()) {
+      notificationMessage += `\n\nNotes: ${notes.trim()}`
+    }
+    if (projectUrl.trim()) {
+      notificationMessage += `\n\nProject link: ${projectUrl.trim()}`
+    }
+    notificationMessage += "\n\n⏰ The conversation will automatically close in 3 days."
+
+    const { error: messageError } = await supabase
+      .from("messages")
+      .insert({
+        conversation_id: conversationId,
+        sender_id: user.id,
+        receiver_id: receiverId,
+        content: notificationMessage,
+        message_type: "text",
+        form_id: targetForm.id
+      })
+
+    if (messageError) {
+      console.error('Message error:', messageError)
+    }
+
+    // Success!
+    toast({
+      title: "Project Submitted Successfully! 🎉",
+      description: "Your project has been delivered to the client.",
+    })
+
+    setProjectUrl("")
+    setNotes("")
+    setFiles([])
+    
+    onOpenChange(false)
+    onSubmitted()
+    
+    console.log('=== PROJECT SUBMISSION SUCCESS ===');
+    
+  } catch (error: any) {
+    console.error("=== PROJECT SUBMISSION ERROR ===", error)
+    toast({
+      title: "Submission Failed",
+      description: error.message || "Failed to submit project. Please try again.",
+      variant: "destructive",
+    })
+  } finally {
+    setLoading(false)
   }
+}
 
   const totalSize = files.reduce((acc, file) => acc + file.size, 0)
   const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2)

@@ -24,6 +24,7 @@ import {
   X,
   Maximize2,
 } from "lucide-react"
+import ReviewForm from "../../../messaging-system/components/Forms/ReviewForm"
 
 interface FreelancerProfile {
   id: string
@@ -38,6 +39,8 @@ interface FreelancerProfile {
   price: number | null
   created_at: string
   updated_at: string
+  average_rating: number | null
+  total_reviews: number | null
 }
 
 interface FreelancerDocument {
@@ -61,33 +64,156 @@ interface UserData {
   }
 }
 
+interface Review {
+  id: string
+  freelancer_id: string
+  client_id: string
+  form_id: string
+  rating: number
+  comment: string | null
+  created_at: string
+  updated_at: string
+  client_email: string
+  client_display_name: string | null
+  client_first_name: string | null
+  client_last_name: string | null
+  client_avatar_url: string | null
+  project_title: string | null
+  project_submitted_at: string | null
+}
+
+interface FreelancerProfileViewProps {
+  profile: FreelancerProfile
+  userData: UserData | null
+  portfolioImages: FreelancerDocument[]
+  certificates: FreelancerDocument[]
+  reviews: Review[]
+}
+
 export default function FreelancerProfileView({
   profile,
   userData,
   portfolioImages,
   certificates,
-}: {
-  profile: FreelancerProfile
-  userData: UserData | null
-  portfolioImages: FreelancerDocument[]
-  certificates: FreelancerDocument[]
-}) {
+  reviews,
+}: FreelancerProfileViewProps) {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [portfolioImageUrls, setPortfolioImageUrls] = useState<string[]>([])
   const [certificateUrls, setCertificateUrls] = useState<string[]>([])
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [canReview, setCanReview] = useState(false)
+  const [eligibleForm, setEligibleForm] = useState<any>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [hasReviewed, setHasReviewed] = useState(false)
   const supabase = createClient()
 
-  // Get the Supabase project URL for constructing direct URLs
-  const getSupabaseUrl = () => {
-    // This gets the URL from your Supabase client configuration
-    const { url } = supabase.storage.from("avatars")
-    return url || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  // Calculate review statistics
+  const calculateReviewStats = () => {
+    if (!reviews || reviews.length === 0) {
+      return {
+        averageRating: 0,
+        totalReviews: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      }
+    }
+
+    const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0)
+    const averageRating = totalRating / reviews.length
+    
+    // Calculate rating distribution
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+    reviews.forEach(review => {
+      ratingDistribution[review.rating as keyof typeof ratingDistribution]++
+    })
+
+    return {
+      averageRating,
+      totalReviews: reviews.length,
+      ratingDistribution
+    }
   }
 
+  // Helper function to get client name consistently
+  const getClientName = (review: Review) => {
+    return review.client_display_name || 
+           `${review.client_first_name || ""} ${review.client_last_name || ""}`.trim() ||
+           review.client_email?.split('@')[0] ||
+           "Anonymous Client";
+  }
+
+  // Helper function to get client initials consistently  
+  const getClientInitials = (review: Review) => {
+    if (review.client_display_name) {
+      const names = review.client_display_name.split(" ");
+      if (names.length >= 2) {
+        return `${names[0][0]}${names[1][0]}`.toUpperCase();
+      }
+      return review.client_display_name.slice(0, 2).toUpperCase();
+    }
+    if (review.client_first_name && review.client_last_name) {
+      return `${review.client_first_name[0]}${review.client_last_name[0]}`.toUpperCase();
+    }
+    if (review.client_email) {
+      return review.client_email.slice(0, 2).toUpperCase();
+    }
+    return "AC";
+  };
+
+  // Check if current user can review this freelancer
+  const checkReviewEligibility = async () => {
+    try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (!user) {
+        return
+      }
+      
+      setCurrentUserId(user.id)
+
+      // Check for completed projects with this freelancer
+      const { data: forms, error } = await supabase
+        .from('forms')
+        .select('*')
+        .eq('sender_id', profile.user_id) // Freelancer is sender
+        .eq('receiver_id', user.id) // Current user is receiver (client)
+        .eq('status', 'accepted')
+        .eq('project_submitted', true) // Project MUST be submitted for review
+
+      if (error) {
+        return
+      }
+
+      if (forms && forms.length > 0) {
+        const form = forms[0] // Use the first eligible form
+        setEligibleForm(form)
+        
+        // Check if already reviewed
+        const { data: existingReview, error: reviewError } = await supabase
+          .from('reviews')
+          .select('*')
+          .eq('form_id', form.id)
+          .eq('client_id', user.id)
+          .maybeSingle()
+
+        setHasReviewed(!!existingReview)
+        setCanReview(true)
+      } else {
+        setCanReview(false)
+        setHasReviewed(false)
+      }
+    } catch (error) {
+      // Silently handle errors
+    }
+  }
+
+  useEffect(() => {
+    checkReviewEligibility()
+  }, [profile.user_id, supabase])
+
   // Function to download avatar image from Supabase storage using user ID
-  // This avatar is stored in the "avatars" bucket and cannot be changed or replaced
   const downloadAvatar = async (userId: string) => {
     try {
       // Try different path structures that might exist
@@ -110,7 +236,6 @@ export default function FreelancerProfileView({
           if (!error && data) {
             const url = URL.createObjectURL(data)
             setAvatarUrl(url)
-            console.log(`Avatar found at path: ${path}`)
             return
           }
         } catch (err) {
@@ -119,11 +244,8 @@ export default function FreelancerProfileView({
         }
       }
 
-      // If no avatar found with any path
-      console.log("No avatar found for user:", userId)
       setAvatarUrl(null)
     } catch (error) {
-      console.log('Error downloading avatar image: ', error)
       setAvatarUrl(null)
     }
   }
@@ -137,7 +259,6 @@ export default function FreelancerProfileView({
         try {
           const { data, error } = await supabase.storage.from("portfolio").download(image.document_url)
           if (error) {
-            console.error("Error downloading portfolio image:", error)
             const publicUrl = supabase.storage.from("portfolio").getPublicUrl(image.document_url).data.publicUrl
             urls.push(publicUrl)
           } else {
@@ -145,14 +266,13 @@ export default function FreelancerProfileView({
             urls.push(url)
           }
         } catch (err) {
-          console.error("Error processing portfolio image:", err)
           urls.push("/placeholder.svg?height=400&width=600")
         }
       }
 
       setPortfolioImageUrls(urls)
     } catch (error) {
-      console.error("Error downloading portfolio images:", error)
+      // Handle error silently
     }
   }
 
@@ -165,7 +285,6 @@ export default function FreelancerProfileView({
         try {
           const { data, error } = await supabase.storage.from("certificates").download(cert.document_url)
           if (error) {
-            console.error("Error downloading certificate:", error)
             const publicUrl = supabase.storage.from("certificates").getPublicUrl(cert.document_url).data.publicUrl
             urls.push(publicUrl)
           } else {
@@ -173,25 +292,22 @@ export default function FreelancerProfileView({
             urls.push(url)
           }
         } catch (err) {
-          console.error("Error processing certificate:", err)
           urls.push("/placeholder.svg?height=300&width=400")
         }
       }
 
       setCertificateUrls(urls)
     } catch (error) {
-      console.error("Error downloading certificates:", error)
+      // Handle error silently
     }
   }
 
   // Download avatar on component mount or when user_id changes
   useEffect(() => {
-    // Download avatar using user ID - this is immutable and from the avatars bucket
     if (profile.user_id) {
       downloadAvatar(profile.user_id)
     }
 
-    // Cleanup function to revoke object URL when component unmounts
     return () => {
       if (avatarUrl && avatarUrl.startsWith('blob:')) {
         URL.revokeObjectURL(avatarUrl)
@@ -209,7 +325,6 @@ export default function FreelancerProfileView({
       downloadCertificates()
     }
 
-    // Cleanup function for portfolio and certificate URLs only
     return () => {
       portfolioImageUrls.forEach((url) => {
         if (url.startsWith("blob:")) {
@@ -277,6 +392,14 @@ export default function FreelancerProfileView({
     return displayName.charAt(0).toUpperCase()
   }
 
+  const handleReviewSubmitted = () => {
+    setHasReviewed(true)
+    // Refresh the page to show the new review
+    window.location.reload()
+  }
+
+  const reviewStats = calculateReviewStats()
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -292,10 +415,6 @@ export default function FreelancerProfileView({
                       <AvatarImage 
                         src={avatarUrl || ""} 
                         alt={displayName}
-                        onError={(e) => {
-                          console.error("Avatar image failed to load, trying fallback")
-                          // Don't hide the image, let the fallback show
-                        }}
                       />
                       <AvatarFallback className="text-2xl bg-[#00D37F] text-white">
                         {getUserInitials()}
@@ -311,10 +430,19 @@ export default function FreelancerProfileView({
                     <div className="flex items-center justify-center gap-2">
                       <div className="flex">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <Star key={star} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                          <Star 
+                            key={star} 
+                            className={`w-5 h-5 ${
+                              star <= Math.round(reviewStats.averageRating)
+                                ? "fill-yellow-400 text-yellow-400"
+                                : "fill-gray-200 text-gray-200"
+                            }`} 
+                          />
                         ))}
                       </div>
-                      <span className="text-sm text-gray-600">5.0 (0 reviews)</span>
+                      <span className="text-sm text-gray-600">
+                        {reviewStats.averageRating.toFixed(1)} ({reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''})
+                      </span>
                     </div>
 
                     {/* Price */}
@@ -332,6 +460,18 @@ export default function FreelancerProfileView({
                     {/* Action Buttons */}
                     <div className="space-y-3">
                       <Button className="w-full bg-[#00D37F] hover:bg-[#00c070] text-white">Contact Freelancer</Button>
+                      
+                      {/* Review Button for eligible clients */}
+                      {canReview && (
+                        <Button
+                          onClick={() => setShowReviewForm(true)}
+                          className={`w-full ${hasReviewed ? 'bg-gray-600 hover:bg-gray-700' : 'bg-blue-600 hover:bg-blue-700'} text-white`}
+                        >
+                          <Star className="w-4 w-4 mr-2" />
+                          {hasReviewed ? 'Update Your Review' : 'Leave a Review'}
+                        </Button>
+                      )}
+                      
                       <div className="flex gap-2">
                         <Button variant="outline" size="sm" className="flex-1">
                           <Heart className="w-4 h-4 mr-2" />
@@ -395,7 +535,6 @@ export default function FreelancerProfileView({
                           alt={`Portfolio image ${currentImageIndex + 1}`}
                           className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
                           onError={(e) => {
-                            console.error("Error loading portfolio image at index:", currentImageIndex)
                             e.currentTarget.src = "/placeholder.svg?height=400&width=600"
                           }}
                         />
@@ -499,7 +638,6 @@ export default function FreelancerProfileView({
                           height: 'auto'
                         }}
                         onError={(e) => {
-                          console.error("Error loading fullscreen portfolio image")
                           e.currentTarget.src = "/placeholder.svg?height=800&width=1200"
                         }}
                       />
@@ -588,7 +726,6 @@ export default function FreelancerProfileView({
                               alt={`Certificate ${index + 1}`}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                console.error("Error loading certificate at index:", index)
                                 e.currentTarget.src = "/placeholder.svg?height=300&width=400"
                               }}
                             />
@@ -647,16 +784,127 @@ export default function FreelancerProfileView({
                   <CardTitle className="text-lg">Reviews</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <div className="flex justify-center mb-4">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star key={star} className="w-8 h-8 fill-yellow-400 text-yellow-400" />
-                      ))}
+                  {reviews && reviews.length > 0 ? (
+                    <div className="space-y-6">
+                      {/* Summary Stats with Rating Distribution */}
+                      <div className="text-center pb-6 border-b">
+                        <div className="flex justify-center mb-4">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <Star 
+                              key={star} 
+                              className={`w-8 h-8 ${
+                                star <= Math.round(reviewStats.averageRating)
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "fill-gray-200 text-gray-200"
+                              }`} 
+                            />
+                          ))}
+                        </div>
+                        <h3 className="text-xl font-semibold mb-2">
+                          {reviewStats.averageRating.toFixed(1)} out of 5
+                        </h3>
+                        <p className="text-gray-600 mb-4">
+                          Based on {reviewStats.totalReviews} review{reviewStats.totalReviews !== 1 ? 's' : ''}
+                        </p>
+
+                        {/* Rating Distribution */}
+                        {reviewStats.totalReviews > 1 && (
+                          <div className="max-w-md mx-auto space-y-2">
+                            {[5, 4, 3, 2, 1].map((rating) => (
+                              <div key={rating} className="flex items-center gap-2 text-sm">
+                                <span className="w-8 text-right">{rating}</span>
+                                <Star className="w-4 h-4 fill-yellow-400 text-yellow-400" />
+                                <div className="flex-1 bg-gray-200 rounded-full h-2">
+                                  <div 
+                                    className="bg-yellow-400 h-2 rounded-full" 
+                                    style={{
+                                      width: `${(reviewStats.ratingDistribution[rating as keyof typeof reviewStats.ratingDistribution] / reviewStats.totalReviews) * 100}%`
+                                    }}
+                                  />
+                                </div>
+                                <span className="w-8 text-left text-gray-500">
+                                  {reviewStats.ratingDistribution[rating as keyof typeof reviewStats.ratingDistribution]}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Individual Reviews */}
+                      <div className="space-y-4">
+                        {reviews.map((review) => {
+                          const clientName = getClientName(review);
+                          
+                          return (
+                            <div key={review.id} className="border-b pb-4 last:border-0">
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarImage 
+                                      src={review.client_avatar_url || ""} 
+                                      alt={clientName}
+                                    />
+                                    <AvatarFallback className="bg-blue-500 text-white text-sm">
+                                      {getClientInitials(review)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="font-medium">
+                                      {clientName}
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex">
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                          <Star 
+                                            key={star} 
+                                            className={`w-4 h-4 ${
+                                              star <= review.rating
+                                                ? "fill-yellow-400 text-yellow-400"
+                                                : "fill-gray-200 text-gray-200"
+                                            }`} 
+                                          />
+                                        ))}
+                                      </div>
+                                      <span className="text-xs text-gray-500">
+                                        {new Date(review.created_at).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                              
+                              {/* Show project title but NOT the comment here */}
+                              {review.project_title && (
+                                <p className="text-xs text-gray-500 mt-2 pl-13">
+                                  Project: {review.project_title}
+                                </p>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Load More Button if needed */}
+                      {reviews.length >= 10 && (
+                        <div className="text-center pt-4">
+                          <Button variant="outline" size="sm">
+                            Load More Reviews
+                          </Button>
+                        </div>
+                      )}
                     </div>
-                    <h3 className="text-xl font-semibold mb-2">5.0 out of 5</h3>
-                    <p className="text-gray-600 mb-4">Based on 0 reviews</p>
-                    <p className="text-gray-500">No reviews yet. Be the first to review this freelancer!</p>
-                  </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="flex justify-center mb-4">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star key={star} className="w-8 h-8 fill-gray-200 text-gray-200" />
+                        ))}
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">No reviews yet</h3>
+                      <p className="text-gray-500">Be the first to review this freelancer!</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -666,16 +914,78 @@ export default function FreelancerProfileView({
                   <CardTitle className="text-lg">Comments</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No comments yet.</p>
-                  </div>
+                  {reviews && reviews.filter(review => review.comment).length > 0 ? (
+                    <div className="space-y-4">
+                      {reviews
+                        .filter(review => review.comment) // Only show reviews with comments
+                        .map((review) => {
+                          const clientName = getClientName(review);
+                          
+                          return (
+                            <div key={`comment-${review.id}`} className="border-b pb-4 last:border-0">
+                              <div className="flex items-start gap-3 mb-2">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarImage 
+                                    src={review.client_avatar_url || ""} 
+                                    alt={clientName}
+                                  />
+                                  <AvatarFallback className="bg-blue-500 text-white text-sm">
+                                    {getClientInitials(review)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between mb-1">
+                                    <p className="font-medium text-sm">
+                                      {clientName}
+                                    </p>
+                                    <span className="text-xs text-gray-500">
+                                      {new Date(review.created_at).toLocaleDateString()}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Show the comment text */}
+                                  <p className="text-gray-700 text-sm">
+                                    {review.comment}
+                                  </p>
+                                  
+                                  {/* Show project context */}
+                                  {review.project_title && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      On project: {review.project_title}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <MessageCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No comments yet.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Review Form Dialog */}
+      {canReview && eligibleForm && (
+        <ReviewForm
+          freelancerId={profile.user_id}
+          clientId={currentUserId!}
+          formId={eligibleForm.id}
+          projectTitle={eligibleForm.title}
+          freelancerName={displayName}
+          open={showReviewForm}
+          onOpenChange={setShowReviewForm}
+          onSubmitted={handleReviewSubmitted}
+        />
+      )}
     </div>
   )
 }

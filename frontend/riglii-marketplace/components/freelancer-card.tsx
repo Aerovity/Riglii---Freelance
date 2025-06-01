@@ -23,9 +23,15 @@ interface FreelancerCardProps {
   price: number | null
 }
 
+interface ReviewStats {
+  averageRating: number
+  totalReviews: number
+}
+
 export default function FreelancerCard({ freelancer }: { freelancer: FreelancerCardProps }) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [portfolioUrl, setPortfolioUrl] = useState<string | null>(null)
+  const [reviewStats, setReviewStats] = useState<ReviewStats>({ averageRating: 0, totalReviews: 0 })
   const supabase = createClient()
 
   const displayName =
@@ -52,6 +58,33 @@ export default function FreelancerCard({ freelancer }: { freelancer: FreelancerC
       return displayName.slice(0, 2).toUpperCase()
     }
     return "FL"
+  }
+
+  // Fetch and calculate review statistics
+  const fetchReviewStats = async () => {
+    try {
+      const { data: reviews, error } = await supabase
+        .from("reviews")
+        .select("rating")
+        .eq("freelancer_id", freelancer.user_id)
+
+      if (!error && reviews && reviews.length > 0) {
+        const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0)
+        const averageRating = totalRating / reviews.length
+        
+        setReviewStats({
+          averageRating: averageRating,
+          totalReviews: reviews.length
+        })
+      } else {
+        setReviewStats({
+          averageRating: 0,
+          totalReviews: 0
+        })
+      }
+    } catch (error) {
+      console.log("Error fetching reviews:", error)
+    }
   }
 
   // Download avatar from avatars bucket
@@ -113,6 +146,7 @@ export default function FreelancerCard({ freelancer }: { freelancer: FreelancerC
   useEffect(() => {
     if (freelancer.user_id) {
       downloadAvatar(freelancer.user_id)
+      fetchReviewStats()
     }
     getPortfolioImage()
 
@@ -173,7 +207,13 @@ export default function FreelancerCard({ freelancer }: { freelancer: FreelancerC
             </Avatar>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[#0F2830] truncate">{displayName}</p>
-              <p className="text-xs text-gray-500">Level 2 • Top Rated</p>
+              <p className="text-xs text-gray-500">
+                {reviewStats.averageRating >= 4.5 && reviewStats.totalReviews >= 5
+                  ? "Top Rated"
+                  : reviewStats.totalReviews > 0
+                  ? "Verified"
+                  : "New Freelancer"}
+              </p>
             </div>
           </div>
 
@@ -184,11 +224,20 @@ export default function FreelancerCard({ freelancer }: { freelancer: FreelancerC
           <div className="flex items-center text-sm text-amber-500 mb-3">
             <div className="flex">
               {[1, 2, 3, 4, 5].map((star) => (
-                <Star key={star} className="h-3 w-3 fill-amber-500 stroke-amber-500" />
+                <Star 
+                  key={star} 
+                  className={`h-3 w-3 ${
+                    star <= Math.round(reviewStats.averageRating)
+                      ? "fill-amber-500 stroke-amber-500"
+                      : "fill-gray-200 stroke-gray-200"
+                  }`} 
+                />
               ))}
             </div>
-            <span className="ml-1 font-medium">5.0</span>
-            <span className="text-gray-400 ml-1">(0)</span>
+            <span className="ml-1 font-medium">
+              {reviewStats.averageRating.toFixed(1)}
+            </span>
+            <span className="text-gray-400 ml-1">({reviewStats.totalReviews})</span>
           </div>
 
           <div className="flex justify-between items-center pt-3 border-t border-gray-100">
