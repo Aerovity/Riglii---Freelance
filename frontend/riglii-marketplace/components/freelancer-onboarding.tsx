@@ -261,12 +261,10 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
         description: "Please wait while we send your profile to the HR department.",
       })
 
-      // Send to HR email instead of user email
-      const hrEmail = "benazzaanis783@gmail.com"
-      
+      // The generateAndSendFreelancerPDF function now automatically sends to multiple HR team members
       const emailResult = await generateAndSendFreelancerPDF({
         ...formData,
-        email: hrEmail, // Send to HR
+        email: userEmail || "", // This is just for the data object
         submissionDate: new Date().toISOString(),
         userEmail: userEmail, // Include actual user email in the data
       })
@@ -438,7 +436,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
       if (emailResult.success) {
         toast({
           title: "Application Submitted Successfully!",
-          description: "Your freelancer profile has been sent to HR for review. You will receive a response within 2-3 business days.",
+          description: `Your freelancer profile has been sent to ${emailResult.recipients?.length || 'the'} HR team member${emailResult.recipients && emailResult.recipients.length > 1 ? 's' : ''} for review. You will receive a response within 2-3 business days.`,
           duration: 5000,
         })
       } else {
@@ -979,7 +977,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
           disabled={!isStepValid() || submitting}
           className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {submitting ? "Creating Profile..." : step < 3 ? "Continue" : "Submit & Send Email"}
+          {submitting ? "Creating Profile..." : step < 3 ? "Continue" : "Submit & Send to HR Team"}
         </Button>
       </div>
     </div>
