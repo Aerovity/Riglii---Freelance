@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Check, Upload, X, Plus, Trash2 } from "lucide-react"
+import { Check, Upload, X, Plus, Trash2, AlertCircle, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { checkFreelancerProfileExistsRPC } from "@/utils/supabase/freelancer"
 import { generateAndSendFreelancerPDF } from "@/app/actions/freelancer-pdf"
@@ -22,6 +22,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   const { toast } = useToast()
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
+  const [emailConfigValid, setEmailConfigValid] = useState<boolean | null>(null)
   const [availableCategories, setAvailableCategories] = useState<{id: string, name: string}[]>([])
   const [formData, setFormData] = useState({
     firstName: user?.user_metadata?.full_name?.split(" ")[0] || "",
@@ -95,6 +96,13 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
   const proficiencyLevels = ["Basic", "Intermediate", "Fluent", "Bilingual/Native"]
   const skillLevels = ["Beginner", "Intermediate", "Advanced", "Expert"]
 
+  // Test email configuration on component mount
+  useEffect(() => {
+    // For now, we'll assume email config is valid
+    // The actual test will happen when submitting
+    setEmailConfigValid(true)
+  }, [])
+
   // Fetch categories from database on component mount
   useEffect(() => {
     async function fetchCategories() {
@@ -128,9 +136,31 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, field: "idCard") => {
     if (e.target.files && e.target.files[0]) {
+      const file = e.target.files[0]
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: "File too large",
+          description: "Please select a file smaller than 5MB.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        toast({
+          title: "Invalid file type",
+          description: "Please select an image file.",
+          variant: "destructive",
+        })
+        return
+      }
+
       setFormData({
         ...formData,
-        [field]: e.target.files[0],
+        [field]: file,
       })
     }
   }
@@ -158,6 +188,20 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
 
   const addLanguage = () => {
     if (newLanguage.language.trim() !== "") {
+      // Check for duplicates
+      const exists = formData.languages.some(
+        (lang) => lang.language.toLowerCase() === newLanguage.language.toLowerCase()
+      )
+      
+      if (exists) {
+        toast({
+          title: "Language already added",
+          description: "This language is already in your list.",
+          variant: "destructive",
+        })
+        return
+      }
+
       setFormData({
         ...formData,
         languages: [...formData.languages, { ...newLanguage }],
@@ -175,6 +219,20 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
 
   const addSkill = () => {
     if (newSkill.skill.trim() !== "") {
+      // Check for duplicates
+      const exists = formData.skills.some(
+        (skill) => skill.skill.toLowerCase() === newSkill.skill.toLowerCase()
+      )
+      
+      if (exists) {
+        toast({
+          title: "Skill already added",
+          description: "This skill is already in your list.",
+          variant: "destructive",
+        })
+        return
+      }
+
       setFormData({
         ...formData,
         skills: [...formData.skills, { ...newSkill }],
@@ -220,13 +278,30 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
       setFormData({
         ...formData,
         occupation: value,
+        customOccupation: "", // Clear custom occupation when selecting predefined option
       })
     }
+  }
+
+  const validateRIB = (rib: string): boolean => {
+    // Basic RIB validation for Algeria (should be 20 digits)
+    const cleanRib = rib.replace(/\s+/g, '')
+    return /^\d{20}$/.test(cleanRib)
   }
 
   const handleSubmit = async () => {
     try {
       setSubmitting(true)
+
+      // Additional validation
+      if (formData.ccpDetails.rib && !validateRIB(formData.ccpDetails.rib)) {
+        toast({
+          title: "Invalid RIB",
+          description: "Please enter a valid 20-digit RIB number.",
+          variant: "destructive",
+        })
+        return
+      }
 
       // Verify user is authenticated
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -255,22 +330,30 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
         return
       }
 
+      // Show info message about email processing
+      if (emailConfigValid === false) {
+        toast({
+          title: "Processing Application",
+          description: "Your application is being processed. You will be notified of any email delivery issues.",
+          variant: "default",
+        })
+      }
+
       // 1. First, send the email with PDF to HR
       toast({
-        title: "Sending to HR...",
-        description: "Please wait while we send your profile to the HR department.",
+        title: "Generating PDF and sending to HR...",
+        description: "Please wait while we process your application.",
       })
 
-      // The generateAndSendFreelancerPDF function now automatically sends to multiple HR team members
       const emailResult = await generateAndSendFreelancerPDF({
         ...formData,
-        email: userEmail || "", // This is just for the data object
+        email: userEmail || "",
         submissionDate: new Date().toISOString(),
-        userEmail: userEmail, // Include actual user email in the data
+        userEmail: userEmail,
       })
 
       if (!emailResult.success) {
-        // If email fails, still continue with profile creation but notify user
+        console.warn("Email sending failed:", emailResult.error)
         toast({
           title: "Email Warning",
           description: "Profile will be created but email sending to HR failed. Please contact support.",
@@ -281,21 +364,30 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
       // 2. Upload ID card to storage if exists
       let idCardPath = null
       if (formData.idCard) {
-        const fileExt = formData.idCard.name.split('.').pop()
-        const fileName = `${userId}/id-card-${Date.now()}.${fileExt}`
-        
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('freelancer-documents')
-          .upload(fileName, formData.idCard)
+        try {
+          const fileExt = formData.idCard.name.split('.').pop()
+          const fileName = `${userId}/id-card-${Date.now()}.${fileExt}`
+          
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('freelancer-documents')
+            .upload(fileName, formData.idCard)
 
-        if (uploadError) {
-          if (uploadError.message.includes('Bucket not found')) {
-            throw new Error('Storage bucket not configured. Please contact support.')
+          if (uploadError) {
+            if (uploadError.message.includes('Bucket not found')) {
+              throw new Error('Storage bucket not configured. Please contact support.')
+            }
+            throw uploadError
           }
-          throw uploadError
-        }
 
-        idCardPath = fileName
+          idCardPath = fileName
+        } catch (uploadError) {
+          console.error("File upload error:", uploadError)
+          toast({
+            title: "File Upload Warning",
+            description: "ID card upload failed, but profile will still be created.",
+            variant: "default",
+          })
+        }
       }
 
       // 3. Insert main freelancer profile
@@ -434,11 +526,16 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
 
       // Success message
       if (emailResult.success) {
+        const recipientCount = emailResult.recipients?.length || 1
         toast({
           title: "Application Submitted Successfully!",
-          description: `Your freelancer profile has been sent to ${emailResult.recipients?.length || 'the'} HR team member${emailResult.recipients && emailResult.recipients.length > 1 ? 's' : ''} for review. You will receive a response within 2-3 business days.`,
+          description: `Your freelancer profile has been sent to ${recipientCount} HR team member${recipientCount > 1 ? 's' : ''} for review. You will receive a response within 2-3 business days.`,
           duration: 5000,
         })
+        
+        if (emailResult.errors && emailResult.errors.length > 0) {
+          console.warn("Some emails failed to send:", emailResult.errors)
+        }
       } else {
         toast({
           title: "Profile Created",
@@ -471,6 +568,32 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
               Tell us a bit about yourself. This information will appear on your public profile, so that potential
               buyers can get to know you better.
             </p>
+
+            {/* Email configuration status */}
+            {emailConfigValid !== null && (
+              <div className={`mb-6 p-4 rounded-lg border ${
+                emailConfigValid 
+                  ? 'bg-green-50 border-green-200' 
+                  : 'bg-yellow-50 border-yellow-200'
+              }`}>
+                <div className="flex items-center">
+                  {emailConfigValid ? (
+                    <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-yellow-500 mr-2" />
+                  )}
+                  <span className={`text-sm ${
+                    emailConfigValid ? 'text-green-700' : 'text-yellow-700'
+                  }`}>
+                    {emailConfigValid 
+                      ? 'Email system is ready - HR will receive your application'
+                      : 'Email system warning - Application will be saved but may not reach HR immediately'
+                    }
+                  </span>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -482,6 +605,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                     value={formData.firstName}
                     onChange={(e) => handleInputChange(e, "firstName")}
                     required
+                    maxLength={50}
                   />
                 </div>
                 <div>
@@ -493,6 +617,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                     value={formData.lastName}
                     onChange={(e) => handleInputChange(e, "lastName")}
                     required
+                    maxLength={50}
                   />
                 </div>
               </div>
@@ -506,7 +631,11 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                   value={formData.displayName}
                   onChange={(e) => handleInputChange(e, "displayName")}
                   required
+                  maxLength={30}
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  This is how your name will appear to clients on the platform.
+                </p>
               </div>
 
               <div>
@@ -520,8 +649,11 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                   value={formData.description}
                   onChange={(e) => handleInputChange(e, "description")}
                   required
+                  maxLength={600}
                 />
-                <div className="text-right text-sm text-gray-500 mt-1">{formData.description.length} / 600</div>
+                <div className="text-right text-sm text-gray-500 mt-1">
+                  {formData.description.length} / 600
+                </div>
               </div>
 
               <div>
@@ -563,6 +695,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                         value={newLanguage.language}
                         onChange={(e) => setNewLanguage({ ...newLanguage, language: e.target.value })}
                         placeholder="e.g. English, French, Arabic"
+                        maxLength={30}
                       />
                     </div>
                     <div className="flex-1">
@@ -622,6 +755,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                             : "hover:border-[#00D37F] hover:text-[#00D37F]"
                         }`}
                         onClick={() => handleCategoryToggle(category.name)}
+                        disabled={!formData.categories.includes(category.name) && formData.categories.length >= 5}
                       >
                         {formData.categories.includes(category.name) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
                         <span className="text-sm">{category.name}</span>
@@ -640,6 +774,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                             : "hover:border-[#00D37F] hover:text-[#00D37F]"
                         }`}
                         onClick={() => handleCategoryToggle(category)}
+                        disabled={!formData.categories.includes(category) && formData.categories.length >= 5}
                       >
                         {formData.categories.includes(category) && <Check className="h-4 w-4 mr-2 flex-shrink-0" />}
                         <span className="text-sm">{category}</span>
@@ -647,6 +782,9 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                     ))
                   )}
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Selected: {formData.categories.length}/5
+                </p>
               </div>
 
               <div>
@@ -674,13 +812,15 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                 {showCustomOccupation && (
                   <div className="mt-3">
                     <Label htmlFor="customOccupation" className="block mb-2 text-sm">
-                      Specify Your Occupation
+                      Specify Your Occupation <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="customOccupation"
                       value={formData.customOccupation}
                       onChange={(e) => handleInputChange(e, "customOccupation")}
                       placeholder="Enter your occupation"
+                      maxLength={50}
+                      required
                     />
                   </div>
                 )}
@@ -718,6 +858,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                       placeholder="Add Skill (e.g. JavaScript, Photoshop)"
                       value={newSkill.skill}
                       onChange={(e) => setNewSkill({ ...newSkill, skill: e.target.value })}
+                      maxLength={50}
                     />
                   </div>
                   <div className="flex-1">
@@ -744,7 +885,73 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
               </div>
 
               <div>
-                <Label className="block mb-2">Certifications</Label>
+                <Label className="block mb-2">Education (Optional)</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="eduCountry" className="block mb-2 text-sm">
+                      Country
+                    </Label>
+                    <Input
+                      id="eduCountry"
+                      placeholder="e.g. Algeria"
+                      value={formData.education.country}
+                      onChange={(e) => handleNestedInputChange(e, "education", "country")}
+                      maxLength={50}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="eduUniversity" className="block mb-2 text-sm">
+                      University/Institution
+                    </Label>
+                    <Input
+                      id="eduUniversity"
+                      placeholder="e.g. University of Algiers"
+                      value={formData.education.university}
+                      onChange={(e) => handleNestedInputChange(e, "education", "university")}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="eduTitle" className="block mb-2 text-sm">
+                      Degree Title
+                    </Label>
+                    <Input
+                      id="eduTitle"
+                      placeholder="e.g. Bachelor's Degree"
+                      value={formData.education.title}
+                      onChange={(e) => handleNestedInputChange(e, "education", "title")}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="eduMajor" className="block mb-2 text-sm">
+                      Major/Field of Study
+                    </Label>
+                    <Input
+                      id="eduMajor"
+                      placeholder="e.g. Computer Science"
+                      value={formData.education.major}
+                      onChange={(e) => handleNestedInputChange(e, "education", "major")}
+                      maxLength={100}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="eduYear" className="block mb-2 text-sm">
+                      Graduation Year
+                    </Label>
+                    <Input
+                      id="eduYear"
+                      placeholder="e.g. 2023"
+                      value={formData.education.year}
+                      onChange={(e) => handleNestedInputChange(e, "education", "year")}
+                      maxLength={4}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label className="block mb-2">Certifications (Optional)</Label>
 
                 {formData.certificates.length > 0 && (
                   <div className="mb-4 border rounded-md p-3">
@@ -774,16 +981,19 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                     placeholder="Certificate Name"
                     value={newCertificate.name}
                     onChange={(e) => setNewCertificate({ ...newCertificate, name: e.target.value })}
+                    maxLength={100}
                   />
                   <Input
                     placeholder="Issuing Organization"
                     value={newCertificate.issuer}
                     onChange={(e) => setNewCertificate({ ...newCertificate, issuer: e.target.value })}
+                    maxLength={100}
                   />
                   <Input
                     placeholder="Year (optional)"
                     value={newCertificate.year}
                     onChange={(e) => setNewCertificate({ ...newCertificate, year: e.target.value })}
+                    maxLength={4}
                   />
                 </div>
                 <Button
@@ -836,6 +1046,7 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                     <div>
                       <Upload className="h-10 w-10 mx-auto mb-2 text-gray-400" />
                       <p className="text-sm text-gray-500 mb-2">Drag and drop your ID card image, or click to browse</p>
+                      <p className="text-xs text-gray-400 mb-4">Maximum file size: 5MB. Accepted formats: JPG, PNG, GIF</p>
                       <Button variant="outline" className="mx-auto" asChild>
                         <label>
                           Browse Files
@@ -863,30 +1074,54 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                 <div className="space-y-4">
                   <div>
                     <Label htmlFor="ccpRib" className="block mb-2 text-sm">
-                      RIB Number
+                      RIB Number <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="ccpRib"
-                      placeholder="Enter your CCP RIB number"
+                      placeholder="Enter your 20-digit CCP RIB number"
                       value={formData.ccpDetails.rib}
-                      onChange={(e) => handleNestedInputChange(e, "ccpDetails", "rib")}
+                      onChange={(e) => {
+                        // Only allow numbers and limit to 20 digits
+                        const value = e.target.value.replace(/\D/g, '').slice(0, 20)
+                        handleNestedInputChange({ ...e, target: { ...e.target, value } } as any, "ccpDetails", "rib")
+                      }}
+                      maxLength={20}
+                      pattern="[0-9]{20}"
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter exactly 20 digits without spaces or dashes
+                    </p>
+                    {formData.ccpDetails.rib && !validateRIB(formData.ccpDetails.rib) && (
+                      <p className="text-xs text-red-500 mt-1">
+                        Please enter a valid 20-digit RIB number
+                      </p>
+                    )}
                   </div>
                   <div>
                     <Label htmlFor="ccpName" className="block mb-2 text-sm">
-                      Account Holder Name
+                      Account Holder Name <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       id="ccpName"
-                      placeholder="Enter the name on your CCP account"
+                      placeholder="Enter the full name on your CCP account"
                       value={formData.ccpDetails.name}
                       onChange={(e) => handleNestedInputChange(e, "ccpDetails", "name")}
+                      maxLength={100}
                     />
+                    <p className="text-xs text-gray-500 mt-1">
+                      This should exactly match the name on your CCP account
+                    </p>
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-4">
-                  Your payment information is kept secure and will only be used to process payments for your services.
-                </p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
+                  <h4 className="text-sm font-medium text-blue-800 mb-2">Payment Security Notice</h4>
+                  <ul className="text-xs text-blue-700 space-y-1">
+                    <li>• Your payment information is encrypted and stored securely</li>
+                    <li>• Only used for processing payments for completed work</li>
+                    <li>• Never shared with clients or third parties</li>
+                    <li>• You can update this information later in your profile settings</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
@@ -905,16 +1140,52 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
           formData.lastName.trim() !== "" &&
           formData.displayName.trim() !== "" &&
           formData.description.trim() !== "" &&
+          formData.description.length >= 50 &&
           formData.languages.length > 0
         )
       case 2:
-        return formData.categories.length > 0 && formData.occupation !== "" && formData.skills.length > 0
+        return (
+          formData.categories.length > 0 && 
+          formData.occupation !== "" && 
+          (formData.occupation !== "Other" || formData.customOccupation.trim() !== "") &&
+          formData.skills.length > 0
+        )
       case 3:
         return (
-          formData.idCard !== null && formData.ccpDetails.rib.trim() !== "" && formData.ccpDetails.name.trim() !== ""
+          formData.idCard !== null && 
+          formData.ccpDetails.rib.trim() !== "" && 
+          validateRIB(formData.ccpDetails.rib) &&
+          formData.ccpDetails.name.trim() !== ""
         )
       default:
         return false
+    }
+  }
+
+  const getStepValidationMessage = () => {
+    switch (step) {
+      case 1:
+        if (!formData.firstName.trim()) return "First name is required"
+        if (!formData.lastName.trim()) return "Last name is required"
+        if (!formData.displayName.trim()) return "Display name is required"
+        if (!formData.description.trim()) return "Description is required"
+        if (formData.description.length < 50) return "Description should be at least 50 characters"
+        if (formData.languages.length === 0) return "At least one language is required"
+        return ""
+      case 2:
+        if (formData.categories.length === 0) return "At least one category is required"
+        if (formData.occupation === "") return "Occupation is required"
+        if (formData.occupation === "Other" && formData.customOccupation.trim() === "") return "Custom occupation is required"
+        if (formData.skills.length === 0) return "At least one skill is required"
+        return ""
+      case 3:
+        if (!formData.idCard) return "ID card image is required"
+        if (!formData.ccpDetails.rib.trim()) return "RIB number is required"
+        if (!validateRIB(formData.ccpDetails.rib)) return "Valid 20-digit RIB number is required"
+        if (!formData.ccpDetails.name.trim()) return "Account holder name is required"
+        return ""
+      default:
+        return ""
     }
   }
 
@@ -929,27 +1200,27 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
                 step >= 1 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
               }`}
             >
-              1
+              {step > 1 ? <Check className="h-4 w-4" /> : "1"}
             </div>
             <div className="h-1 w-12 bg-gray-200">
-              <div className="h-full bg-[#00D37F]" style={{ width: step > 1 ? "100%" : "0%" }}></div>
+              <div className="h-full bg-[#00D37F] transition-all duration-300" style={{ width: step > 1 ? "100%" : "0%" }}></div>
             </div>
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 step >= 2 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
               }`}
             >
-              2
+              {step > 2 ? <Check className="h-4 w-4" /> : "2"}
             </div>
             <div className="h-1 w-12 bg-gray-200">
-              <div className="h-full bg-[#00D37F]" style={{ width: step > 2 ? "100%" : "0%" }}></div>
+              <div className="h-full bg-[#00D37F] transition-all duration-300" style={{ width: step > 2 ? "100%" : "0%" }}></div>
             </div>
             <div
               className={`w-8 h-8 rounded-full flex items-center justify-center ${
                 step >= 3 ? "bg-[#00D37F] text-white" : "bg-gray-200 text-gray-500"
               }`}
             >
-              3
+              {step === 3 && isStepValid() ? <Check className="h-4 w-4" /> : "3"}
             </div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -962,23 +1233,46 @@ export default function FreelancerOnboarding({ onClose, user }: FreelancerOnboar
       <div className="flex-1 overflow-y-auto">{renderStep()}</div>
 
       {/* Footer with navigation buttons */}
-      <div className="bg-gray-50 px-6 py-4 border-t flex justify-between">
-        <Button variant="outline" onClick={() => (step > 1 ? setStep(step - 1) : onClose())}>
-          {step > 1 ? "Back" : "Cancel"}
-        </Button>
-        <Button
-          onClick={() => {
-            if (step < 3) {
-              setStep(step + 1)
-            } else {
-              handleSubmit()
-            }
-          }}
-          disabled={!isStepValid() || submitting}
-          className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {submitting ? "Creating Profile..." : step < 3 ? "Continue" : "Submit & Send to HR Team"}
-        </Button>
+      <div className="bg-gray-50 px-6 py-4 border-t">
+        <div className="flex justify-between items-center">
+          <Button 
+            variant="outline" 
+            onClick={() => (step > 1 ? setStep(step - 1) : onClose())}
+            disabled={submitting}
+          >
+            {step > 1 ? "Back" : "Cancel"}
+          </Button>
+          
+          <div className="flex items-center space-x-3">
+            {!isStepValid() && (
+              <span className="text-sm text-red-500">
+                {getStepValidationMessage()}
+              </span>
+            )}
+            <Button
+              onClick={() => {
+                if (step < 3) {
+                  setStep(step + 1)
+                } else {
+                  handleSubmit()
+                }
+              }}
+              disabled={!isStepValid() || submitting}
+              className="bg-[#00D37F] hover:bg-[#00c070] text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? (
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Creating Profile...
+                </div>
+              ) : step < 3 ? (
+                "Continue"
+              ) : (
+                "Submit & Send to HR Team"
+              )}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   )

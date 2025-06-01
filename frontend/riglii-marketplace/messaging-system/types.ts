@@ -18,26 +18,31 @@ export interface PublicUser {
 
 // Form/Proposal type
 // Update Form interface
+// Update your Form type in types.ts
 export interface Form {
-  id: string;
-  conversation_id: string;
-  sender_id: string;
-  receiver_id: string;
-  title: string;
-  description: string;
-  price: number;
-  time_estimate: string;
-  status: 'pending' | 'accepted' | 'refused' | 'cancelled';
-  form_type: 'proposal' | 'commercial';
-  project_submitted?: boolean;
-  project_submission_url?: string;
-  project_submitted_at?: Date | string;
-  project_files?: ProjectFile[]; // New field
-  project_notes?: string; // New field
-  created_at: Date | string;
-  updated_at: Date | string;
-  responded_at?: Date | string;
-  digital_signature?: string;
+  id: string
+  conversation_id: string // Make sure this is not optional
+  title: string
+  description: string
+  price: number
+  time_estimate: string
+  status: 'pending' | 'accepted' | 'refused'
+  form_type: 'proposal' | 'commercial'
+  sender_id: string
+  receiver_id: string
+  created_at: string
+  responded_at?: string
+  project_files?: string[]
+  project_notes?: string
+  project_submitted?: boolean
+  project_submitted_at?: string
+  project_submission_url?: string
+  digital_signature?: string
+}
+
+// If you need to handle cases where conversation_id might be missing temporarily:
+export interface PartialForm extends Omit<Form, 'conversation_id'> {
+  conversation_id?: string
 }
 
 // New interface for project files

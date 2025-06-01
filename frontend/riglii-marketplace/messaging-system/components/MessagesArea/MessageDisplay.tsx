@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getUserInitials, getTimeAgo } from "../../utils/formatters"
-import { Package, Download, Link, FileText, Loader2 } from "lucide-react"
+import { Package, Download, Link, FileText, Loader2 } from 'lucide-react'
 import { downloadProjectFile, fetchProjectFilesFromStorage } from "../../utils/storage"
 import FormDisplay from "../Forms/FormDisplay"
 import type { Message } from "../../types"
@@ -63,10 +63,10 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
     } catch (err) {
       console.error('Download error:', err)
       toast({
-        title: "Download Failed",
-        description: "An error occurred while downloading the file.",
-        variant: "destructive",
-      })
+          title: "Download Failed",
+          description: "An error occurred while downloading the file.",
+          variant: "destructive",
+        })
     } finally {
       setDownloading(null)
     }
@@ -95,7 +95,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
   // Fetch project files if this is a project delivery message
   useEffect(() => {
     const fetchProjectFiles = async () => {
-      if (!isProjectDelivery || !projectForm?.id || loadingFiles) return
+      if (!isProjectDelivery || !projectForm || loadingFiles) return
       
       setLoadingFiles(true)
       
@@ -162,13 +162,13 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
     }
     
     fetchProjectFiles()
-  }, [isProjectDelivery, projectForm?.id])
+  }, [isProjectDelivery, projectForm, loadingFiles])
   
   // If it's a form message
   if (message.message_type === 'form' && message.form) {
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className="max-w-lg">
+        <div className="max-w-md">
           <FormDisplay 
             form={message.form} 
             currentUserId={currentUserId}
@@ -183,21 +183,40 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
 
   // If it's a project delivery message, show enhanced display
   if (isProjectDelivery) {
-    // Parse the message to extract file count
-    const fileCountMatch = message.content.match(/\((\d+) file/);
-    const fileCount = fileCountMatch ? parseInt(fileCountMatch[1]) : 1;
+    // Parse the message content
+    const lines = message.content.split('\n').filter(line => line.trim())
     
-    // Get project data
-    const files = projectFiles.length > 0 ? projectFiles : [];
-    const projectUrl = projectForm?.project_submission_url;
-    const projectNotes = projectForm?.project_notes || message.content.split('\n\n')[1];
+    // Extract file count from the first line
+    const fileCountMatch = lines[0].match(/\((\d+) file/);
+    const fileCount = fileCountMatch ? parseInt(fileCountMatch[1]) : 0;
+    
+    // Extract notes - look for "Notes:" and take everything after it on the same line or next line
+    let projectNotes = "";
+    const notesMatch = message.content.match(/Notes:\s*(.+?)(?=\n\n|Project link:|$)/s);
+    if (notesMatch && notesMatch[1]) {
+      projectNotes = notesMatch[1].trim();
+    }
+    
+    // Extract project link - look for "Project link:" and take the URL after it
+    let projectUrl = "";
+    const linkMatch = message.content.match(/Project link:\s*(.+?)(?=\n|$)/);
+    if (linkMatch && linkMatch[1]) {
+      projectUrl = linkMatch[1].trim();
+    }
+    
+    // Get data from the form if available
+    if (projectForm) {
+      projectUrl = projectForm.project_submission_url || projectUrl;
+      projectNotes = projectForm.project_notes || projectNotes;
+    }
+    
     const submittedAt = projectForm?.project_submitted_at ? new Date(projectForm.project_submitted_at) : new Date(message.created_at);
     const daysSinceSubmission = Math.floor((Date.now() - submittedAt.getTime()) / (1000 * 60 * 60 * 24));
     const daysRemaining = Math.max(0, 3 - daysSinceSubmission);
 
     return (
       <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
-        <Avatar className="h-8 w-8 flex-shrink-0">
+        <Avatar className="h-8 w-8 flex-shrink-0 -mt-3">
           <AvatarImage src={message.sender?.avatar_url || undefined} />
           <AvatarFallback>
             {getUserInitials(message.sender?.full_name || 'Unknown')}
@@ -208,32 +227,61 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           <Card className="bg-green-50 border-green-200">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <Package className="h-5 w-5 text-green-600 mt-1" />
-                <div className="flex-1">
-                  <h4 className="font-semibold text-green-900">Project Delivered</h4>
+                <Package className="h-5 w-5 text-green-600 flex-shrink-0" />
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-green-900 leading-tight">Project Delivered</h4>
+                    {fileCount > 0 && (
+                      <p className="text-sm text-green-700 mt-1">
+                        📦 Project delivered! ({fileCount} file{fileCount > 1 ? 's' : ''})
+                      </p>
+                    )}
+                  </div>
                   
-                  {/* Show delivery message */}
-                  <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{message.content}</p>
-                  
-                  {daysRemaining > 0 && (
-                    <p className="text-xs text-amber-600 mt-2 font-medium">
-                      ⏰ Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
-                    </p>
+                  {/* Delivery Notes */}
+                  {projectNotes && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Notes:</p>
+                      <p className="text-sm text-gray-600 mt-1">{projectNotes}</p>
+                    </div>
                   )}
                   
-                  {daysRemaining === 0 && (
-                    <p className="text-xs text-red-600 mt-2 font-medium">
-                      🔒 Conversation is closed
-                    </p>
+                  {/* External Link */}
+                  {projectUrl && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Project link:</p>
+                      <a 
+                        href={projectUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="inline-flex items-start gap-2 text-sm text-blue-600 hover:text-blue-800 mt-1"
+                      >
+                        <Link className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                        <span className="break-all">{projectUrl}</span>
+                      </a>
+                    </div>
                   )}
+                  
+                  {/* Conversation closure warning */}
+                  <div className="text-sm">
+                    {daysRemaining > 0 ? (
+                      <p className="text-amber-600 font-medium">
+                        ⏰ The conversation will automatically close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}.
+                      </p>
+                    ) : (
+                      <p className="text-red-600 font-medium">
+                        🔒 Conversation is closed
+                      </p>
+                    )}
+                  </div>
                   
                   {/* Project Files */}
-                  {(files.length > 0 || fileCount > 0) && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Files:</p>
-                      <div className="space-y-2">
-                        {files.length > 0 ? (
-                          files.map((file: any, index: number) => (
+                  {(projectFiles.length > 0 || fileCount > 0) && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Files:</p>
+                      <div className="space-y-2 mt-2">
+                        {projectFiles.length > 0 ? (
+                          projectFiles.map((file: any, index: number) => (
                             <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
                               <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <FileText className="h-4 w-4 text-gray-500" />
@@ -281,36 +329,12 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
                       </div>
                     </div>
                   )}
-                  
-                  {/* External Link */}
-                  {projectUrl && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">External Link:</p>
-                      <a 
-                        href={projectUrl} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        <Link className="h-4 w-4" />
-                        {projectUrl}
-                      </a>
-                    </div>
-                  )}
-                  
-                  {/* Project Notes */}
-                  {projectNotes && (
-                    <div className="mt-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Notes:</p>
-                      <p className="text-sm text-gray-600">{projectNotes}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <span className="text-xs text-gray-500 mt-1">
+          <span className="text-xs text-gray-500 mt-1.5 px-1">
             {getTimeAgo(new Date(message.created_at))}
           </span>
         </div>
@@ -321,16 +345,16 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
   // Regular message display
   return (
     <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
-      <Avatar className="h-8 w-8 flex-shrink-0">
+      <Avatar className="h-8 w-8 flex-shrink-0 -mt-3 self-start">
         <AvatarImage src={message.sender?.avatar_url || undefined} />
         <AvatarFallback>
           {getUserInitials(message.sender?.full_name || 'Unknown')}
         </AvatarFallback>
       </Avatar>
 
-      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%]`}>
+      <div className={`flex flex-col ${isOwn ? 'items-end ml-11' : 'items-start mr-11'} max-w-[70%]`}>
         <div
-          className={`rounded-lg px-4 py-2 ${
+          className={`rounded-lg px-3 py-2.5 ${
             isOwn 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-muted'
@@ -340,7 +364,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           
           {attachmentUrl && message.attachment_type === 'image' && (
             <img 
-              src={attachmentUrl} 
+              src={attachmentUrl || "/placeholder.svg"} 
               alt="Attachment" 
               className="mt-2 rounded max-w-full max-h-64"
             />
@@ -358,7 +382,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           )}
         </div>
 
-        <span className="text-xs text-gray-500 mt-1">
+        <span className="text-xs text-gray-500 mt-1.5 px-1">
           {getTimeAgo(new Date(message.created_at))}
         </span>
       </div>
