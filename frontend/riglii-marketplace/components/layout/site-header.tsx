@@ -143,7 +143,7 @@ export default function SiteHeader() {
     if (searchQuery.trim()) {
       // Replace spaces with hyphens for URL-friendly format
       const urlFriendlyQuery = searchQuery.trim().toLowerCase().replace(/\s+/g, '-')
-      router.push(`/${urlFriendlyQuery}`)
+      router.push(`/category/${urlFriendlyQuery}`)
     }
   }
 
