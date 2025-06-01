@@ -1,9 +1,11 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
+import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, Paperclip, FileText, Receipt, Loader2, Upload, CheckCircle } from "lucide-react"
+import { Send, Paperclip, FileText, Receipt, Loader2, Upload, CheckCircle, Star } from "lucide-react"
 import OfferForm from "../Forms/OfferForm"
 import ProjectSubmission from "../Forms/ProjectSubmission"
+import ReviewForm from "../Forms/ReviewForm"
 
 interface MessageInputProps {
   onSendMessage: (content: string, file?: File) => Promise<void>
@@ -27,7 +29,10 @@ export default function MessageInput({
   const [message, setMessage] = useState("")
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [showProjectSubmission, setShowProjectSubmission] = useState(false)
+  const [showReviewForm, setShowReviewForm] = useState(false)
+  const [hasReviewed, setHasReviewed] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const supabase = createClient()
 
   // Get all forms in the conversation
   const allForms = messages.filter(m => m.message_type === 'form' && m.form)
@@ -68,6 +73,28 @@ export default function MessageInput({
   const canSubmitProject = isCurrentUserFreelancer && 
     acceptedCommercialForm && 
     !projectSubmitted
+
+  // Check if client has already reviewed
+  useEffect(() => {
+    const checkExistingReview = async () => {
+      if (!isCurrentUserFreelancer && acceptedCommercialForm?.form?.id && currentUserId && projectSubmitted) {
+        try {
+          const { data, error } = await supabase
+            .from("reviews")
+            .select("id")
+            .eq("form_id", acceptedCommercialForm.form.id)
+            .eq("client_id", currentUserId)
+            .maybeSingle()
+          
+          setHasReviewed(!!data)
+        } catch (err) {
+          console.error('Error checking review:', err)
+        }
+      }
+    }
+    
+    checkExistingReview()
+  }, [acceptedCommercialForm?.form?.id, currentUserId, isCurrentUserFreelancer, projectSubmitted, supabase])
 
   // Determine conversation state
   const getConversationState = () => {
@@ -230,87 +257,121 @@ export default function MessageInput({
     const daysRemaining = Math.max(0, 3 - daysSinceSubmission)
 
     return (
-      <form onSubmit={handleSubmit} className="p-4 border-t">
-        {/* Project completed banner */}
-        <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="h-5 w-5 text-green-600" />
-            <div>
-              <p className="text-sm font-medium text-green-800">
-                Project has been delivered ✅
-              </p>
-              {daysRemaining > 0 ? (
-                <p className="text-xs text-green-600 mt-1">
-                  Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
-                </p>
-              ) : (
-                <p className="text-xs text-red-600 mt-1">
-                  Conversation is closed
-                </p>
+      <>
+        <form onSubmit={handleSubmit} className="p-4 border-t">
+          {/* Project completed banner with review button for clients */}
+          <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm font-medium text-green-800">
+                    Project has been delivered ✅
+                  </p>
+                  {daysRemaining > 0 ? (
+                    <p className="text-xs text-green-600 mt-1">
+                      Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-red-600 mt-1">
+                      Conversation is closed
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* Show review button for clients */}
+              {!isCurrentUserFreelancer && acceptedCommercialForm && (
+                <Button
+                  type="button"
+                  onClick={() => setShowReviewForm(true)}
+                  className={hasReviewed ? "bg-gray-600 hover:bg-gray-700" : "bg-blue-600 hover:bg-blue-700"}
+                  size="sm"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  {hasReviewed ? "Update Review" : "Leave Review"}
+                </Button>
               )}
             </div>
           </div>
-        </div>
 
-        {selectedFile && daysRemaining > 0 && (
-          <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
-            <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
+          {selectedFile && daysRemaining > 0 && (
+            <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
+              <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedFile(null)}
+              >
+                Remove
+              </Button>
+            </div>
+          )}
+          
+          <div className="flex items-end gap-2">
+            <div className="flex-1 relative">
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={daysRemaining > 0 ? "Type a message..." : "Conversation is closed"}
+                disabled={sending || daysRemaining === 0}
+                className="resize-none pr-10 min-h-[44px] max-h-32"
+                rows={1}
+              />
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileSelect}
+              accept="image/*,.pdf,.doc,.docx,.txt"
+            />
+
             <Button
               type="button"
+              size="icon"
               variant="ghost"
-              size="sm"
-              onClick={() => setSelectedFile(null)}
+              onClick={() => fileInputRef.current?.click()}
+              disabled={daysRemaining === 0}
             >
-              Remove
+              <Paperclip className="h-4 w-4" />
+            </Button>
+
+            <Button
+              type="submit"
+              size="icon"
+              disabled={!message.trim() || sending || daysRemaining === 0}
+              className="bg-[#00D37F] hover:bg-[#00c070]"
+            >
+              {sending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4" />
+              )}
             </Button>
           </div>
-        )}
-        
-        <div className="flex items-end gap-2">
-          <div className="flex-1 relative">
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={daysRemaining > 0 ? "Type a message..." : "Conversation is closed"}
-              disabled={sending || daysRemaining === 0}
-              className="resize-none pr-10 min-h-[44px] max-h-32"
-              rows={1}
-            />
-          </div>
+        </form>
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt"
+        {/* Review Form Dialog for clients */}
+        {!isCurrentUserFreelancer && acceptedCommercialForm && (
+          <ReviewForm
+            freelancerId={acceptedCommercialForm.form.sender_id}
+            clientId={currentUserId!}
+            formId={acceptedCommercialForm.form.id}
+            projectTitle={acceptedCommercialForm.form.title}
+            freelancerName={conversation.participant.full_name || "the freelancer"}
+            open={showReviewForm}
+            onOpenChange={setShowReviewForm}
+            onSubmitted={() => {
+              setHasReviewed(true)
+              onFormSent?.()
+            }}
           />
-
-          <Button
-            type="button"
-            size="icon"
-            variant="ghost"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={daysRemaining === 0}
-          >
-            <Paperclip className="h-4 w-4" />
-          </Button>
-
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!message.trim() || sending || daysRemaining === 0}
-            className="bg-[#00D37F] hover:bg-[#00c070]"
-          >
-            {sending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Send className="h-4 w-4" />
-            )}
-          </Button>
-        </div>
-      </form>
+        )}
+      </>
     )
   }
 

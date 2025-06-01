@@ -40,6 +40,47 @@ export default async function FreelancerProfilePage({
     .eq("document_type", "certificate")
     .order("created_at", { ascending: false })
 
+  // Get reviews for this freelancer with client information
+  const { data: reviews, error: reviewsError } = await supabase
+    .from("reviews")
+    .select(`
+      *,
+      forms!inner(
+        title,
+        project_submitted_at
+      ),
+      users!reviews_client_id_fkey(
+        email,
+        freelancer_profiles(
+          display_name,
+          first_name,
+          last_name,
+          profile_picture_url
+        )
+      )
+    `)
+    .eq("freelancer_id", id)
+    .order("created_at", { ascending: false })
+
+  // Transform reviews data to match the expected interface
+  const transformedReviews = reviews?.map(review => ({
+    id: review.id,
+    freelancer_id: review.freelancer_id,
+    client_id: review.client_id,
+    form_id: review.form_id,
+    rating: review.rating,
+    comment: review.comment,
+    created_at: review.created_at,
+    updated_at: review.updated_at,
+    client_email: review.users?.email || '',
+    client_display_name: review.users?.freelancer_profiles?.[0]?.display_name || null,
+    client_first_name: review.users?.freelancer_profiles?.[0]?.first_name || null,
+    client_last_name: review.users?.freelancer_profiles?.[0]?.last_name || null,
+    client_avatar_url: review.users?.freelancer_profiles?.[0]?.profile_picture_url || null,
+    project_title: review.forms?.title || null,
+    project_submitted_at: review.forms?.project_submitted_at || null
+  })) || []
+
   if (portfolioError) {
     console.error("Error loading portfolio:", portfolioError)
   }
@@ -48,12 +89,17 @@ export default async function FreelancerProfilePage({
     console.error("Error loading certificates:", certificatesError)
   }
 
+  if (reviewsError) {
+    console.error("Error loading reviews:", reviewsError)
+  }
+
   return (
     <FreelancerProfileView
       profile={profile}
       userData={userData}
       portfolioImages={portfolioImages || []}
       certificates={certificates || []}
+      reviews={transformedReviews}
     />
   )
 }
