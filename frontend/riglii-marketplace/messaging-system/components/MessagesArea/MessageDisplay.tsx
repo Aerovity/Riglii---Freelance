@@ -5,7 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getUserInitials, getTimeAgo } from "../../utils/formatters"
-import { Package, Download, Link, FileText, Loader2 } from 'lucide-react'
+import { Package, Download, Link, FileText, Loader2 } from "lucide-react"
 import { downloadProjectFile, fetchProjectFilesFromStorage } from "../../utils/storage"
 import FormDisplay from "../Forms/FormDisplay"
 import type { Message } from "../../types"
@@ -63,10 +63,10 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
     } catch (err) {
       console.error('Download error:', err)
       toast({
-          title: "Download Failed",
-          description: "An error occurred while downloading the file.",
-          variant: "destructive",
-        })
+        title: "Download Failed",
+        description: "An error occurred while downloading the file.",
+        variant: "destructive",
+      })
     } finally {
       setDownloading(null)
     }
@@ -95,7 +95,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
   // Fetch project files if this is a project delivery message
   useEffect(() => {
     const fetchProjectFiles = async () => {
-      if (!isProjectDelivery || !projectForm || loadingFiles) return
+      if (!isProjectDelivery || !projectForm?.id || loadingFiles) return
       
       setLoadingFiles(true)
       
@@ -162,13 +162,13 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
     }
     
     fetchProjectFiles()
-  }, [isProjectDelivery, projectForm, loadingFiles])
+  }, [isProjectDelivery, projectForm?.id])
   
   // If it's a form message
   if (message.message_type === 'form' && message.form) {
     return (
       <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className="max-w-md">
+        <div className="max-w-lg">
           <FormDisplay 
             form={message.form} 
             currentUserId={currentUserId}
@@ -215,8 +215,8 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
     const daysRemaining = Math.max(0, 3 - daysSinceSubmission);
 
     return (
-      <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
-        <Avatar className="h-8 w-8 flex-shrink-0 -mt-3">
+      <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse pl-11' : 'pr-11'}`}>
+        <Avatar className="h-8 w-8 flex-shrink-0">
           <AvatarImage src={message.sender?.avatar_url || undefined} />
           <AvatarFallback>
             {getUserInitials(message.sender?.full_name || 'Unknown')}
@@ -227,10 +227,10 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           <Card className="bg-green-50 border-green-200">
             <CardContent className="p-4">
               <div className="flex items-start gap-3">
-                <Package className="h-5 w-5 text-green-600 flex-shrink-0" />
+                <Package className="h-5 w-5 text-green-600 mt-1 flex-shrink-0" />
                 <div className="flex-1 space-y-4">
                   <div>
-                    <h4 className="font-semibold text-green-900 leading-tight">Project Delivered</h4>
+                    <h4 className="font-semibold text-green-900">Project Delivered</h4>
                     {fileCount > 0 && (
                       <p className="text-sm text-green-700 mt-1">
                         📦 Project delivered! ({fileCount} file{fileCount > 1 ? 's' : ''})
@@ -334,7 +334,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
             </CardContent>
           </Card>
 
-          <span className="text-xs text-gray-500 mt-1.5 px-1">
+          <span className="text-xs text-gray-500 mt-1">
             {getTimeAgo(new Date(message.created_at))}
           </span>
         </div>
@@ -344,17 +344,17 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
 
   // Regular message display
   return (
-    <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse' : ''}`}>
-      <Avatar className="h-8 w-8 flex-shrink-0 -mt-3 self-start">
+    <div className={`flex gap-3 mb-4 ${isOwn ? 'flex-row-reverse pl-11' : 'pr-11'}`}>
+      <Avatar className="h-8 w-8 flex-shrink-0">
         <AvatarImage src={message.sender?.avatar_url || undefined} />
         <AvatarFallback>
           {getUserInitials(message.sender?.full_name || 'Unknown')}
         </AvatarFallback>
       </Avatar>
 
-      <div className={`flex flex-col ${isOwn ? 'items-end ml-11' : 'items-start mr-11'} max-w-[70%]`}>
+      <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'} max-w-[70%]`}>
         <div
-          className={`rounded-lg px-3 py-2.5 ${
+          className={`rounded-lg px-4 py-2 ${
             isOwn 
               ? 'bg-primary text-primary-foreground' 
               : 'bg-muted'
@@ -364,7 +364,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           
           {attachmentUrl && message.attachment_type === 'image' && (
             <img 
-              src={attachmentUrl || "/placeholder.svg"} 
+              src={attachmentUrl} 
               alt="Attachment" 
               className="mt-2 rounded max-w-full max-h-64"
             />
@@ -382,7 +382,7 @@ export default function MessageDisplay({ message, isOwn, currentUserId, allMessa
           )}
         </div>
 
-        <span className="text-xs text-gray-500 mt-1.5 px-1">
+        <span className="text-xs text-gray-500 mt-1">
           {getTimeAgo(new Date(message.created_at))}
         </span>
       </div>
