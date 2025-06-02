@@ -31,17 +31,31 @@ export default function ProjectDeliveryDisplay({ form, currentUserId }: ProjectD
   const handleDownloadFile = async (file: any) => {
     setDownloading(file.file_path)
     
-    const result = await downloadProjectFile(file.file_path, file.file_name)
-    
-    if (!result.success) {
+    try {
+      const result = await downloadProjectFile(file)
+      
+      if (result.success) {
+        toast({
+          title: "Download Started",
+          description: `Downloading ${file.file_name}`,
+        })
+      } else {
+        toast({
+          title: "Download Failed",
+          description: "Failed to download file. Please try again.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Download error:', error)
       toast({
         title: "Download Failed",
-        description: "Failed to download file. Please try again.",
+        description: "An error occurred while downloading the file.",
         variant: "destructive",
       })
+    } finally {
+      setDownloading(null)
     }
-    
-    setDownloading(null)
   }
   
   const formatFileSize = (bytes: number) => {
@@ -54,44 +68,71 @@ export default function ProjectDeliveryDisplay({ form, currentUserId }: ProjectD
     <Card className="w-full bg-green-50 border-green-200">
       <CardContent className="p-4">
         <div className="flex items-start gap-3">
-          <Package className="h-5 w-5 text-green-600 mt-1" />
-          <div className="flex-1">
-            <h4 className="font-semibold text-green-900">Project Delivered</h4>
-            <p className="text-sm text-green-700 mt-1">
-              Delivered {submittedAt?.toLocaleDateString()} at {submittedAt?.toLocaleTimeString()}
-            </p>
+          <Package className="h-5 w-5 text-green-600 mt-1 flex-shrink-0" />
+          <div className="flex-1 space-y-3">
+            {/* Header */}
+            <div>
+              <h4 className="font-semibold text-green-900 mb-1">Project Delivered</h4>
+              <p className="text-sm text-green-700">
+                Delivered {submittedAt?.toLocaleDateString()} at {submittedAt?.toLocaleTimeString()}
+              </p>
+            </div>
             
-            {daysRemaining > 0 && (
-              <p className="text-xs text-amber-600 mt-2 font-medium">
+            {/* Status Warning */}
+            {daysRemaining > 0 ? (
+              <p className="text-sm text-amber-600 font-medium">
                 ⏰ Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
               </p>
-            )}
-            
-            {daysRemaining === 0 && (
-              <p className="text-xs text-red-600 mt-2 font-medium">
+            ) : (
+              <p className="text-sm text-red-600 font-medium">
                 🔒 Conversation is closed
               </p>
             )}
             
+            {/* Delivery Notes */}
+            {projectNotes && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">Delivery Notes:</p>
+                <p className="text-sm text-gray-600 whitespace-pre-wrap">{projectNotes}</p>
+              </div>
+            )}
+            
+            {/* External Link */}
+            {projectUrl && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-1">External Link:</p>
+                <a 
+                  href={projectUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-start gap-2 text-sm text-blue-600 hover:text-blue-800 break-all"
+                >
+                  <Link className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <span className="break-all">{projectUrl}</span>
+                </a>
+              </div>
+            )}
+            
             {/* Project Files */}
             {projectFiles.length > 0 && (
-              <div className="mt-4">
+              <div>
                 <p className="text-sm font-medium text-gray-700 mb-2">Files:</p>
                 <div className="space-y-2">
                   {projectFiles.map((file: any, index: number) => (
-                    <div key={index} className="flex items-center justify-between p-2 bg-white rounded-lg border border-gray-200">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <FileText className="h-4 w-4 text-gray-500" />
-                        <span className="text-sm text-gray-700 truncate">{file.file_name}</span>
-                        <span className="text-xs text-gray-500">
-                          ({formatFileSize(file.file_size)})
-                        </span>
+                    <div key={index} className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                      <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-700 truncate">{file.file_name}</p>
                       </div>
+                      <span className="text-xs text-gray-500 flex-shrink-0">
+                        ({formatFileSize(file.file_size)})
+                      </span>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => handleDownloadFile(file)}
                         disabled={downloading === file.file_path}
+                        className="flex-shrink-0"
                       >
                         {downloading === file.file_path ? (
                           <Loader2 className="h-4 w-4 animate-spin" />
@@ -102,30 +143,6 @@ export default function ProjectDeliveryDisplay({ form, currentUserId }: ProjectD
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-            
-            {/* External Link */}
-            {projectUrl && (
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-2">External Link:</p>
-                <a 
-                  href={projectUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  <Link className="h-4 w-4" />
-                  {projectUrl}
-                </a>
-              </div>
-            )}
-            
-            {/* Delivery Notes */}
-            {projectNotes && (
-              <div className="mt-4">
-                <p className="text-sm font-medium text-gray-700 mb-1">Delivery Notes:</p>
-                <p className="text-sm text-gray-600 whitespace-pre-wrap">{projectNotes}</p>
               </div>
             )}
           </div>

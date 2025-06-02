@@ -15,12 +15,13 @@ import { Label } from "@/components/ui/label"
 import { FileText, Send, Loader2, DollarSign, Clock, Receipt } from "lucide-react"
 import type { FormData } from "../../types"
 import { validateFormData } from "../../utils/validations"
+import { sendProposalReceivedEmail } from "@/app/actions/emails"
 
 interface OfferFormProps {
   conversationId: string
   receiverId: string
   senderId: string
-  isFreelancer: boolean // New prop
+  isFreelancer: boolean
   onFormSent?: () => void
   trigger?: React.ReactNode
 }
@@ -50,8 +51,33 @@ export default function OfferForm({
   const formIcon = isFreelancer ? Receipt : FileText
 
   const handleSubmit = async () => {
+    console.log("=== OFFER FORM SUBMIT DEBUG START ===")
+    console.log("1. Initial form submission parameters:")
+    console.log("   - Form type:", isFreelancer ? "Commercial" : "Proposal")
+    console.log("   - Conversation ID:", conversationId)
+    console.log("   - Sender ID:", senderId)
+    console.log("   - Receiver ID:", receiverId)
+    console.log("   - Form data:", {
+      title: formData.title,
+      description: formData.description.substring(0, 50) + "...",
+      price: formData.price,
+      timeEstimate: formData.timeEstimate
+    })
+    
+    // Validate conversation ID first
+    if (!conversationId) {
+      console.error("2. CRITICAL ERROR: conversationId is missing!")
+      toast({
+        title: "Error",
+        description: "Missing conversation ID. Please refresh and try again.",
+        variant: "destructive",
+      })
+      return
+    }
+    
     const validation = validateFormData(formData)
     if (!validation.isValid) {
+      console.log("2. Form validation failed:", validation.error)
       toast({
         title: "Invalid Form",
         description: validation.error,
@@ -59,26 +85,215 @@ export default function OfferForm({
       })
       return
     }
+    console.log("2. Form validation passed")
 
     setLoading(true)
     try {
-      const { data, error } = await supabase
-        .from("forms")
-        .insert({
-          conversation_id: conversationId,
-          sender_id: senderId,
-          receiver_id: receiverId,
-          title: formData.title.trim(),
-          description: formData.description.trim(),
-          price: Number.parseFloat(formData.price),
-          time_estimate: formData.timeEstimate.trim(),
-          status: "pending",
-          form_type: formType, // Set form type
-        })
-        .select()
+      console.log("3. Starting database operations...")
+      
+      // Verify conversation exists first
+      console.log("4. Verifying conversation exists...")
+      const { data: conversation, error: convError } = await supabase
+        .from('conversations')
+        .select('id, user1_id, user2_id')
+        .eq('id', conversationId)
         .single()
 
-      if (error) throw error
+      if (convError || !conversation) {
+        console.error("4. Conversation verification failed:", convError)
+        throw new Error("Conversation not found")
+      }
+      
+      console.log("4. Conversation verified:", {
+        id: conversation.id,
+        user1_id: conversation.user1_id,
+        user2_id: conversation.user2_id
+      })
+
+      console.log("5. Fetching sender user data...")
+      const { data: senderUser, error: senderError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          freelancer_profiles(
+            id,
+            first_name,
+            last_name,
+            display_name
+          )
+        `)
+        .eq('id', senderId)
+        .single()
+
+      console.log("6. Sender data result:", {
+        hasData: !!senderUser,
+        userId: senderUser?.id,
+        email: senderUser?.email,
+        hasProfile: !!senderUser?.freelancer_profiles?.[0],
+        profileName: senderUser?.freelancer_profiles?.[0]?.display_name || 
+                    senderUser?.freelancer_profiles?.[0]?.first_name,
+        error: senderError
+      })
+
+      if (senderError) {
+        console.error("6. Sender fetch error:", senderError)
+        throw senderError
+      }
+
+      console.log("7. Fetching receiver user data...")
+      const { data: receiverUser, error: receiverError } = await supabase
+        .from('users')
+        .select(`
+          id,
+          email,
+          freelancer_profiles(
+            id,
+            first_name,
+            last_name,
+            display_name
+          )
+        `)
+        .eq('id', receiverId)
+        .single()
+
+      console.log("8. Receiver data result:", {
+        hasData: !!receiverUser,
+        userId: receiverUser?.id,
+        email: receiverUser?.email,
+        hasProfile: !!receiverUser?.freelancer_profiles?.[0],
+        profileName: receiverUser?.freelancer_profiles?.[0]?.display_name || 
+                    receiverUser?.freelancer_profiles?.[0]?.first_name,
+        error: receiverError
+      })
+
+      if (receiverError) {
+        console.error("8. Receiver fetch error:", receiverError)
+        throw receiverError
+      }
+
+      // Create the form with explicit conversation_id
+      console.log("9. Creating form with data:")
+      const formInsertData = {
+        conversation_id: conversationId,
+        sender_id: senderId,
+        receiver_id: receiverId,
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        price: Number.parseFloat(formData.price),
+        time_estimate: formData.timeEstimate.trim(),
+        status: "pending",
+        form_type: formType,
+      }
+      console.log("9. Form insert data:", formInsertData)
+
+      const { data: createdForm, error: formError } = await supabase
+        .from("forms")
+        .insert(formInsertData)
+        .select(`
+          id,
+          conversation_id,
+          sender_id,
+          receiver_id,
+          title,
+          description,
+          price,
+          time_estimate,
+          status,
+          form_type,
+          created_at
+        `)
+        .single()
+
+      if (formError) {
+        console.error("10. Form creation error:", formError)
+        console.error("    Error details:", {
+          code: formError.code,
+          message: formError.message,
+          details: formError.details,
+          hint: formError.hint
+        })
+        throw formError
+      }
+      
+      console.log("10. Form created successfully:", {
+        id: createdForm.id,
+        conversation_id: createdForm.conversation_id,
+        title: createdForm.title,
+        status: createdForm.status,
+        form_type: createdForm.form_type
+      })
+
+      // Verify the form was created with conversation_id
+      if (!createdForm.conversation_id) {
+        console.error("11. CRITICAL: Form created but conversation_id is null!")
+        throw new Error("Form created but missing conversation_id")
+      }
+      console.log("11. Form conversation_id verified:", createdForm.conversation_id)
+
+      // Send email notification for proposal forms
+      console.log("12. Email notification check:")
+      console.log("    - Is freelancer (skip email):", isFreelancer)
+      console.log("    - Receiver has email:", !!receiverUser?.email)
+      console.log("    - Sender data available:", !!senderUser)
+      
+      if (!isFreelancer && receiverUser?.email && senderUser) {
+        console.log("13. Preparing to send proposal received email...")
+        try {
+          const receiverName = receiverUser.freelancer_profiles?.[0]?.display_name || 
+                             receiverUser.freelancer_profiles?.[0]?.first_name || 
+                             receiverUser.email.split('@')[0]
+
+          const senderName = senderUser.freelancer_profiles?.[0]?.display_name ||
+                           senderUser.freelancer_profiles?.[0]?.first_name ||
+                           senderUser.email?.split('@')[0] || 'Client'
+
+          console.log("14. Email parameters prepared:", {
+            recipientEmail: receiverUser.email,
+            recipientName: receiverName,
+            proposalTitle: formData.title.trim(),
+            clientName: senderName,
+            clientEmail: senderUser.email || '',
+            projectBudget: Number.parseFloat(formData.price),
+            timeEstimate: formData.timeEstimate.trim(),
+            hasDescription: !!formData.description.trim()
+          })
+
+          console.log("15. Calling sendProposalReceivedEmail...")
+          const emailResult = await sendProposalReceivedEmail({
+            recipientEmail: receiverUser.email,
+            recipientName: receiverName,
+            proposalTitle: formData.title.trim(),
+            clientName: senderName,
+            clientEmail: senderUser.email || '',
+            projectBudget: Number.parseFloat(formData.price),
+            timeEstimate: formData.timeEstimate.trim(),
+            projectDescription: formData.description.trim()
+          })
+          
+          console.log("16. Email sent successfully:", emailResult)
+        } catch (emailError) {
+          console.error("EMAIL ERROR CAUGHT:", emailError)
+          console.error("Email error details:", {
+            name: emailError instanceof Error ? emailError.name : 'Unknown',
+            message: emailError instanceof Error ? emailError.message : emailError,
+            stack: emailError instanceof Error ? emailError.stack : 'No stack trace'
+          })
+          // Don't fail the whole operation if email fails
+        }
+      } else {
+        console.log("13. Skipping email notification:")
+        if (isFreelancer) {
+          console.log("    - Reason: Commercial forms don't trigger emails")
+        } else if (!receiverUser?.email) {
+          console.log("    - Reason: Receiver has no email address")
+        } else if (!senderUser) {
+          console.log("    - Reason: Sender data not found")
+        }
+      }
+
+      console.log("17. Form submission completed successfully")
+      console.log("=== OFFER FORM SUBMIT DEBUG END ===")
 
       toast({
         title: "Form Sent",
@@ -95,8 +310,17 @@ export default function OfferForm({
 
       setOpen(false)
       onFormSent?.()
+      
     } catch (error) {
-      console.error("Error sending form:", error)
+      console.error("=== FORM SUBMIT ERROR ===")
+      console.error("Error caught in main try-catch:", error)
+      console.error("Error details:", {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : error,
+        stack: error instanceof Error ? error.stack : 'No stack trace'
+      })
+      console.log("=== FORM SUBMIT ERROR END ===")
+      
       toast({
         title: "Error",
         description: "Failed to send form. Please try again.",

@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -15,6 +15,7 @@ import {
 import { CheckCircle, XCircle, Clock, DollarSign, FileText, Receipt, Package } from "lucide-react"
 import type { Form } from "../../types"
 import ProjectDeliveryDisplay from "./ProjectDeliveryDisplay"
+import { sendProposalAcceptedEmail, sendCommercialAcceptedEmail } from "@/app/actions/emails"
 
 interface FormDisplayProps {
   form: Form
@@ -39,11 +40,22 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
   const isSender = form.sender_id === currentUserId
   const canRespond = isReceiver && form.status === "pending"
 
+  // Debug logging
+  useEffect(() => {
+    console.log("FormDisplay received form:", {
+      id: form.id,
+      conversation_id: form.conversation_id,
+      title: form.title,
+      hasConversationId: !!form.conversation_id,
+      formKeys: Object.keys(form)
+    })
+  }, [form])
+
   // Fetch form_type if it's missing
   const [realFormType, setRealFormType] = useState(form.form_type)
   
   // If form_type is missing, fetch it from the database
-  useState(() => {
+  useEffect(() => {
     if (!form.form_type && form.id) {
       supabase
         .from('forms')
@@ -57,7 +69,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
           }
         })
     }
-  })
+  }, [form.form_type, form.id, supabase])
 
   // Determine form type icon and label
   const isCommercialForm = realFormType === 'commercial'
@@ -102,6 +114,16 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
   }
 
   const handleAccept = async () => {
+    console.log("=== FORM ACCEPT DEBUG START ===")
+    console.log("1. Form type:", isCommercialForm ? "Commercial" : "Proposal")
+    console.log("2. Form details:", {
+      formId: form.id,
+      senderId: form.sender_id,
+      receiverId: form.receiver_id,
+      currentUserId,
+      conversationId: form.conversation_id // Log this to see if it's null
+    })
+
     if (!canvasRef.current) return
     
     // Check if canvas has any drawing
@@ -128,6 +150,59 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
     
     setUpdating(true)
     try {
+      // If conversation_id is missing, fetch the complete form data
+      let conversationId = form.conversation_id;
+      
+      if (!conversationId) {
+        console.log("2.5. conversation_id is missing, fetching form data...")
+        const { data: fullForm, error: formFetchError } = await supabase
+          .from('forms')
+          .select('*')
+          .eq('id', form.id)
+          .single()
+        
+        if (formFetchError) {
+          console.error("Failed to fetch form data:", formFetchError)
+          throw new Error("Failed to fetch form data")
+        }
+        
+        conversationId = fullForm.conversation_id
+        console.log("2.6. Fetched conversation_id:", conversationId)
+        
+        if (!conversationId) {
+          throw new Error("Form has no conversation_id")
+        }
+      }
+
+      // Get sender and receiver details for email
+      console.log("3. Fetching sender data...")
+      const { data: senderData, error: senderError } = await supabase
+        .from('users')
+        .select('email, freelancer_profiles(first_name, last_name, display_name)')
+        .eq('id', form.sender_id)
+        .single()
+
+      console.log("4. Sender data result:", {
+        hasData: !!senderData,
+        email: senderData?.email,
+        error: senderError
+      })
+
+      console.log("5. Fetching receiver data...")
+      const { data: receiverData, error: receiverError } = await supabase
+        .from('users')
+        .select('email, freelancer_profiles(first_name, last_name, display_name)')
+        .eq('id', currentUserId)
+        .single()
+
+      console.log("6. Receiver data result:", {
+        hasData: !!receiverData,
+        email: receiverData?.email,
+        error: receiverError
+      })
+
+      // Update form status
+      console.log("7. Updating form status...")
       const { error: formError } = await supabase
         .from("forms")
         .update({
@@ -137,24 +212,100 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
         })
         .eq("id", form.id)
 
-      if (formError) throw formError
+      if (formError) {
+        console.error("8. Form update error:", formError)
+        throw formError
+      }
+      console.log("8. Form updated successfully")
 
       // Customize message based on form type
       const acceptanceMessage = isCommercialForm 
         ? "✅ Commercial form accepted. The freelancer can now deliver the project."
         : "✅ Proposal accepted. You can now exchange messages."
 
+      console.log("9. Inserting message with conversation_id:", conversationId)
       const { error: messageError } = await supabase
         .from("messages")
         .insert({
-          conversation_id: form.conversation_id,
+          conversation_id: conversationId, // Use the fetched or existing conversation_id
           sender_id: currentUserId,
           receiver_id: form.sender_id,
           content: acceptanceMessage,
           message_type: "text"
         })
 
-      if (messageError) throw messageError
+      if (messageError) {
+        console.error("10. Message insert error:", messageError)
+        throw messageError
+      }
+      console.log("10. Message inserted successfully")
+
+      // Send email notification
+      console.log("11. PREPARING TO SEND EMAIL")
+      console.log("   - Has sender email:", !!senderData?.email)
+      console.log("   - Sender email:", senderData?.email)
+      console.log("   - Is commercial form:", isCommercialForm)
+      
+      try {
+        if (senderData?.email) {
+          console.log("12. Email sending conditions met, preparing data...")
+          
+          const senderName = senderData.freelancer_profiles?.[0]?.display_name || 
+                           senderData.freelancer_profiles?.[0]?.first_name || 
+                           senderData.email.split('@')[0]
+
+          const clientName = receiverData?.freelancer_profiles?.[0]?.display_name ||
+                           receiverData?.freelancer_profiles?.[0]?.first_name ||
+                           receiverData?.email?.split('@')[0] || 'Client'
+
+          console.log("13. Email parameters:", {
+            recipientEmail: senderData.email,
+            recipientName: senderName,
+            title: form.title,
+            clientName: clientName,
+            price: form.price,
+            timeEstimate: form.time_estimate
+          })
+
+          console.log("14. Calling email function...")
+          let emailResult;
+          
+          if (isCommercialForm) {
+            console.log("15. Sending commercial accepted email...")
+            emailResult = await sendCommercialAcceptedEmail({
+              recipientEmail: senderData.email,
+              recipientName: senderName,
+              commercialTitle: form.title,
+              clientName: clientName,
+              acceptedDate: new Date(),
+              totalPrice: form.price,
+              deliveryTime: form.time_estimate
+            })
+          } else {
+            console.log("15. Sending proposal accepted email...")
+            emailResult = await sendProposalAcceptedEmail({
+              recipientEmail: senderData.email,
+              recipientName: senderName,
+              proposalTitle: form.title,
+              clientName: clientName,
+              acceptedDate: new Date(),
+              projectBudget: form.price,
+              timeEstimate: form.time_estimate
+            })
+          }
+          
+          console.log("16. EMAIL RESULT:", emailResult)
+        } else {
+          console.log("12. NO SENDER EMAIL FOUND - Skipping email")
+        }
+      } catch (emailError) {
+        console.error("EMAIL ERROR CAUGHT:", emailError)
+        console.error("Stack trace:", emailError instanceof Error ? emailError.stack : emailError)
+        // Don't fail the whole operation if email fails
+      }
+
+      console.log("17. Form acceptance complete")
+      console.log("=== FORM ACCEPT DEBUG END ===")
 
       toast({
         title: `${formTypeLabel} Accepted`,
@@ -164,7 +315,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
       setShowSignature(false)
       onStatusUpdate?.()
     } catch (error) {
-      console.error("Error accepting form:", error)
+      console.error("FORM ACCEPT ERROR:", error)
       toast({
         title: "Error",
         description: "Failed to accept the form. Please try again.",
@@ -178,6 +329,23 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
   const handleRefuse = async () => {
     setUpdating(true)
     try {
+      // Get conversation_id if missing
+      let conversationId = form.conversation_id;
+      
+      if (!conversationId) {
+        const { data: fullForm, error: formFetchError } = await supabase
+          .from('forms')
+          .select('conversation_id')
+          .eq('id', form.id)
+          .single()
+        
+        if (formFetchError || !fullForm?.conversation_id) {
+          throw new Error("Failed to get conversation ID")
+        }
+        
+        conversationId = fullForm.conversation_id
+      }
+
       const { error: formError } = await supabase
         .from("forms")
         .update({
@@ -195,7 +363,7 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
       const { error: messageError } = await supabase
         .from("messages")
         .insert({
-          conversation_id: form.conversation_id,
+          conversation_id: conversationId,
           sender_id: currentUserId,
           receiver_id: form.sender_id,
           content: refusalMessage,
