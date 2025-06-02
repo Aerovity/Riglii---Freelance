@@ -146,7 +146,7 @@ export default function Home() {
       description: "Professional websites and web applications",
       icon: Code,
       image: "/web-development-tools.jpg",
-      slug: "web-development",
+      slug: "category/web-development",
     },
     {
       id: 2,
@@ -154,7 +154,7 @@ export default function Home() {
       description: "Creative designs for your brand",
       icon: Palette,
       image: "/Adobe-Photoshop.jpg",
-      slug: "graphic-design",
+      slug: "category/graphic-design",
     },
     {
       id: 3,
@@ -162,7 +162,7 @@ export default function Home() {
       description: "Grow your business online",
       icon: Briefcase,
       image: "/marketing.jpg",
-      slug: "digital-marketing",
+      slug: "category/digital-marketing",
     },
     {
       id: 4,
@@ -170,7 +170,7 @@ export default function Home() {
       description: "Capture your special moments",
       icon: Camera,
       image: "/camera.jpg",
-      slug: "photography",
+      slug: "category/photography",
     },
   ]
 
@@ -334,7 +334,7 @@ export default function Home() {
           >
             <h2 className="text-2xl font-bold text-[#0F2830]">{t("exploreCategories")}</h2>
             <div className="flex items-center gap-2">
-              <Link href="/categories" className="text-[#00D37F] font-medium text-sm hover:underline">
+              <Link href="/categories/design" className="text-[#00D37F] font-medium text-sm hover:underline">
                 {t("showAll")}
               </Link>
               <div className="flex gap-1">
@@ -432,7 +432,7 @@ export default function Home() {
               <h2 className="text-2xl font-bold text-[#0F2830] mb-2">{t("getInspired") || "Featured Freelancers"}</h2>
               <p className="text-gray-600">Discover talented professionals ready to bring your projects to life</p>
             </div>
-            <Link href="/browse" className="text-[#00D37F] font-medium text-sm hover:underline">
+            <Link href="/category/browse" className="text-[#00D37F] font-medium text-sm hover:underline">
               View All Freelancers
             </Link>
           </div>
