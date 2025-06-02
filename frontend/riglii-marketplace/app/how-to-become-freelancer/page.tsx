@@ -10,7 +10,6 @@ import {
   FileText,
   Star,
   TrendingUp,
-  Shield,
   Zap,
   ArrowRight,
   CheckCircle,
@@ -27,7 +26,7 @@ export default function HowToBecomeFreelancer() {
       title: "Create Your Profile",
       content:
         "Set up a compelling profile that showcases your skills, experience, and portfolio. Add a professional photo and write a captivating bio that highlights your expertise.",
-      image: "/placeholder.svg?height=400&width=600",
+      image: "/freelancer-workspace.jpg",
       icon: <UserCheck className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -35,7 +34,7 @@ export default function HowToBecomeFreelancer() {
       title: "Build Your Portfolio",
       content:
         "Upload your best work samples and case studies. Show potential clients what you can deliver by displaying high-quality examples of your previous projects.",
-      image: "/placeholder.svg?height=400&width=600",
+      image: "/freelancer-workspace.jpg",
       icon: <FileText className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -43,7 +42,7 @@ export default function HowToBecomeFreelancer() {
       title: "Set Your Rates",
       content:
         "Research market rates and set competitive pricing for your services. Start with competitive rates to build your reputation, then increase as you gain more reviews.",
-      image: "/placeholder.svg?height=400&width=600",
+      image: "/freelancer-workspace.jpg",
       icon: <DollarSign className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -51,7 +50,7 @@ export default function HowToBecomeFreelancer() {
       title: "Get Your First Reviews",
       content:
         "Deliver exceptional work to your first clients to earn 5-star reviews. Great reviews are crucial for attracting more clients and building your reputation on the platform.",
-      image: "/placeholder.svg?height=400&width=600",
+      image: "/freelancer-workspace.jpg",
       icon: <Star className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -59,17 +58,12 @@ export default function HowToBecomeFreelancer() {
       title: "Scale Your Business",
       content:
         "As you gain experience and positive reviews, you can increase your rates, take on bigger projects, and build long-term relationships with clients.",
-      image: "/placeholder.svg?height=400&width=600",
+      image: "/freelancer-workspace.jpg",
       icon: <TrendingUp className="w-6 h-6 text-[#00D37F]" />,
     },
   ]
 
   const benefits = [
-    {
-      icon: <Shield className="w-8 h-8 text-[#00D37F]" />,
-      title: "Secure Payments",
-      description: "Get paid safely with our escrow system and payment protection",
-    },
     {
       icon: <Zap className="w-8 h-8 text-[#00D37F]" />,
       title: "Quick Setup",
@@ -112,13 +106,15 @@ export default function HowToBecomeFreelancer() {
               guide to start earning money with your skills.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-[#00D37F] hover:bg-[#00B86A] text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              >
-                Start Freelancing Now
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
+              <Link href="/login?mode=signup">
+                <Button
+                  size="lg"
+                  className="bg-[#00D37F] hover:bg-[#00B86A] text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+                >
+                  Start Freelancing Now
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="lg"
@@ -149,7 +145,7 @@ export default function HowToBecomeFreelancer() {
       {/* Features Section */}
       <Features data={freelancerSteps} collapseDelay={6000} linePosition="left" />
 
-      {/* Benefits Section */}
+      {/* Benefits Section - Centered */}
       <section className="py-20 px-4 bg-white">
         <div className="container mx-auto max-w-6xl">
           <motion.div
@@ -164,25 +160,28 @@ export default function HowToBecomeFreelancer() {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {benefits.map((benefit, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.1 }}
-              >
-                <Card className="h-full border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
-                  <CardHeader className="text-center pb-4">
-                    <div className="mx-auto mb-4 p-3 rounded-2xl bg-[#AFF8C8]/20 w-fit">{benefit.icon}</div>
-                    <CardTitle className="text-xl font-bold text-[#0F2830]">{benefit.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-center">
-                    <CardDescription className="text-gray-600">{benefit.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+          {/* Centered 3-column grid */}
+          <div className="flex justify-center">
+            <div className="grid md:grid-cols-3 gap-8 max-w-4xl">
+              {benefits.map((benefit, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.6, delay: index * 0.1 }}
+                >
+                  <Card className="h-full border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <CardHeader className="text-center pb-4">
+                      <div className="mx-auto mb-4 p-3 rounded-2xl bg-[#AFF8C8]/20 w-fit">{benefit.icon}</div>
+                      <CardTitle className="text-xl font-bold text-[#0F2830]">{benefit.title}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-center">
+                      <CardDescription className="text-gray-600">{benefit.description}</CardDescription>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -197,13 +196,15 @@ export default function HowToBecomeFreelancer() {
               than 5 minutes to get started.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                size="lg"
-                className="bg-white text-[#00D37F] hover:bg-gray-100 px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
-              >
-                Create Your Profile
-                <CheckCircle className="ml-2 w-5 h-5" />
-              </Button>
+              <Link href="/login?mode=signup">
+                <Button
+                  size="lg"
+                  className="bg-white text-[#00D37F] hover:bg-gray-100 px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
+                >
+                  Create Your Profile
+                  <CheckCircle className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
               <Button
                 variant="outline"
                 size="lg"
