@@ -1,17 +1,18 @@
 "use client"
 
+import type React from "react"
+
 import Link from "next/link"
 import Image from "next/image"
-import { Search, UserIcon, Settings, LogOut } from "lucide-react"
+import { Search, UserIcon, Settings, LogOut, Menu, X } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import { useLanguage } from "@/app/language-provider"
-import NotificationsDropdown from "@/components/notifications-dropdown"
-import MessagesDropdown from "@/components/messages-dropdown"
 import CategoriesDropdown from "@/components/categories-dropdown"
+import MessagesDropdown from "@/components/messages-dropdown"
 import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
@@ -23,6 +24,31 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import FreelancerOnboarding from "@/components/freelancer-onboarding"
+import { cn } from "@/lib/utils"
+import { motion, useScroll, useSpring, AnimatePresence } from "framer-motion"
+
+interface ScrollProgressProps {
+  className?: string
+}
+
+function ScrollProgress({ className }: ScrollProgressProps) {
+  const { scrollYProgress } = useScroll()
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 400,
+    damping: 40,
+    restDelta: 0.001,
+  })
+
+  return (
+    <motion.div
+      className={cn("fixed inset-x-0 top-0 z-[1000] h-1 origin-left", className)}
+      style={{
+        scaleX,
+        background: "linear-gradient(90deg, #00D37F 0%, #00B86A 50%, #00D37F 100%)",
+      }}
+    />
+  )
+}
 
 export default function SiteHeader() {
   const { t, language } = useLanguage()
@@ -32,20 +58,33 @@ export default function SiteHeader() {
   const [showOnboarding, setShowOnboarding] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
+  const [isScrolled, setIsScrolled] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [searchFocused, setSearchFocused] = useState(false)
   const supabase = createClient()
   const router = useRouter()
+
+  // Handle scroll for effects
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10)
+    }
+
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   // Function to download avatar image from Supabase storage
   const downloadAvatar = async (path: string) => {
     try {
-      const { data, error } = await supabase.storage.from('avatars').download(path)
+      const { data, error } = await supabase.storage.from("avatars").download(path)
       if (error) {
         throw error
       }
       const url = URL.createObjectURL(data)
       setAvatarUrl(url)
     } catch (error) {
-      console.log('Error downloading avatar image: ', error)
+      console.log("Error downloading avatar image: ", error)
       setAvatarUrl(null)
     }
   }
@@ -58,7 +97,7 @@ export default function SiteHeader() {
       } = await supabase.auth.getUser()
       setUser(user)
       setLoading(false)
-      
+
       // Download avatar if user has one
       if (user?.user_metadata?.avatar_url) {
         downloadAvatar(user.user_metadata.avatar_url)
@@ -73,7 +112,7 @@ export default function SiteHeader() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
       setLoading(false)
-      
+
       // Download avatar for new user or clear avatar if user logged out
       if (session?.user?.user_metadata?.avatar_url) {
         downloadAvatar(session.user.user_metadata.avatar_url)
@@ -120,7 +159,7 @@ export default function SiteHeader() {
     }
     await supabase.auth.signOut()
     // Redirect to home page after sign out
-    router.push('/')
+    router.push("/")
   }
 
   const getUserInitials = (user: User) => {
@@ -142,156 +181,339 @@ export default function SiteHeader() {
     e.preventDefault()
     if (searchQuery.trim()) {
       // Replace spaces with hyphens for URL-friendly format
-      const urlFriendlyQuery = searchQuery.trim().toLowerCase().replace(/\s+/g, '-')
+      const urlFriendlyQuery = searchQuery.trim().toLowerCase().replace(/\s+/g, "-")
       router.push(`/category/${urlFriendlyQuery}`)
     }
   }
 
   return (
     <>
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 flex items-center justify-between h-16">
-          <div className="flex items-center gap-6 flex-1">
-            <Link href="/" className="flex items-center shrink-0">
-              <Image src="/Riglii_logo.png" alt="Riglii Logo" width={360} height={120} className="h-20 w-auto" />
-            </Link>
-            <form onSubmit={handleSearch} className="relative flex items-center flex-1 max-w-xl">
-              <Input
-                type="text"
-                placeholder={t("search")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pr-10 border-gray-300 focus:border-[#00D37F] focus:ring-[#00D37F]"
-                dir={isRtl ? "rtl" : "ltr"}
-              />
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="absolute right-0 bg-[#00D37F] text-white rounded-l-none h-full"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </form>
+      {/* Scroll Progress Bar */}
+      <ScrollProgress />
+
+      {/* Fixed Header Container */}
+      <motion.div
+        className={cn(
+          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          isScrolled ? "bg-white/95 backdrop-blur-xl shadow-xl border-b border-gray-200/50" : "bg-white",
+        )}
+        initial={{ y: -100 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      >
+        {/* Main Header */}
+        <header className="relative">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between h-20">
+              {/* Left Section: Logo & Search */}
+              <div className="flex items-center gap-8 flex-1">
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Link href="/" className="flex items-center shrink-0">
+                    <div className="relative">
+                      <Image
+                        src="/Riglii_logo.png"
+                        alt="Riglii Logo"
+                        width={140}
+                        height={45}
+                        className="h-12 w-auto"
+                        priority
+                      />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#00D37F] rounded-full animate-pulse" />
+                    </div>
+                  </Link>
+                </motion.div>
+
+                <motion.form
+                  onSubmit={handleSearch}
+                  className="relative flex-1 max-w-2xl hidden lg:flex"
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                >
+                  <div
+                    className={cn(
+                      "relative w-full transition-all duration-300",
+                      searchFocused && "transform scale-[1.02]",
+                    )}
+                  >
+                    <Input
+                      type="text"
+                      placeholder={t("search") || "Search for services..."}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onFocus={() => setSearchFocused(true)}
+                      onBlur={() => setSearchFocused(false)}
+                      className={cn(
+                        "w-full h-12 pr-14 pl-6 text-base rounded-2xl border-2 transition-all duration-300",
+                        searchFocused
+                          ? "border-[#00D37F] shadow-lg shadow-green-100"
+                          : "border-gray-200 hover:border-gray-300",
+                      )}
+                      dir={isRtl ? "rtl" : "ltr"}
+                    />
+                    <Button
+                      type="submit"
+                      size="icon"
+                      className="absolute right-1 top-1 h-10 w-10 bg-[#00D37F] hover:bg-[#00B86A] text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+                    >
+                      <Search className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </motion.form>
+              </div>
+
+              {/* Right Section: Navigation */}
+              <nav className="flex items-center gap-6">
+                <motion.div
+                  className="hidden lg:flex items-center gap-6"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <Link
+                    href="/how-to-become-freelancer"
+                    className="relative group text-[#0F2830] hover:text-[#00D37F] text-sm font-semibold transition-all duration-300"
+                  >
+                    How to Become a Freelancer
+                    <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#00D37F] group-hover:w-full transition-all duration-300" />
+                  </Link>
+                  <Link
+                    href="/how-to-order"
+                    className="relative group text-[#0F2830] hover:text-[#00D37F] text-sm font-semibold transition-all duration-300"
+                  >
+                    How to Order
+                    <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#00D37F] group-hover:w-full transition-all duration-300" />
+                  </Link>
+                </motion.div>
+
+                {/* Show messages when user is logged in */}
+                {user && (
+                  <motion.div
+                    className="hidden md:flex items-center gap-3"
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <MessagesDropdown />
+                  </motion.div>
+                )}
+
+                {loading ? (
+                  <div className="w-10 h-10 bg-gradient-to-r from-gray-200 to-gray-300 rounded-xl animate-pulse" />
+                ) : user ? (
+                  // User Menu
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          className="relative h-10 w-10 rounded-xl p-0 hover:scale-105 transition-all duration-300"
+                        >
+                          <Avatar className="h-10 w-10 ring-2 ring-[#00D37F] ring-offset-2">
+                            {avatarUrl && <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="Profile" />}
+                            <AvatarFallback className="bg-[#00D37F] text-white text-sm font-bold">
+                              {getUserInitials(user)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#00D37F] rounded-full border-2 border-white" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        className="w-64 p-2 rounded-2xl shadow-2xl border-0 bg-white/95 backdrop-blur-xl"
+                        align="end"
+                        forceMount
+                      >
+                        <div className="flex items-center gap-3 p-4 rounded-xl bg-[#AFF8C8]/10 mb-2">
+                          <Avatar className="h-12 w-12">
+                            {avatarUrl && <AvatarImage src={avatarUrl || "/placeholder.svg"} alt="Profile" />}
+                            <AvatarFallback className="bg-[#00D37F] text-white font-bold">
+                              {getUserInitials(user)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 truncate">
+                              {user.user_metadata?.full_name || user.user_metadata?.name || "User"}
+                            </p>
+                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                          </div>
+                        </div>
+                        <DropdownMenuSeparator className="my-2" />
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/account"
+                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                          >
+                            <div className="p-2 rounded-lg bg-[#AFF8C8]/20 text-[#00D37F]">
+                              <UserIcon className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium">{t("dashboard") || "Dashboard"}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/account"
+                            className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-all duration-200"
+                          >
+                            <div className="p-2 rounded-lg bg-[#AFF8C8]/20 text-[#00D37F]">
+                              <Settings className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium">{t("settings") || "Settings"}</span>
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="my-2" />
+                        <DropdownMenuItem
+                          onClick={() => setShowOnboarding(true)}
+                          className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#AFF8C8]/10 cursor-pointer transition-all duration-200"
+                        >
+                          <div className="p-2 rounded-lg bg-[#AFF8C8]/20 text-[#00D37F]">
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M13 10V3L4 14h7v7l9-11h-7z"
+                              />
+                            </svg>
+                          </div>
+                          <span className="font-medium">{t("becomeFreelancer") || "Become Freelancer"}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="my-2" />
+                        <DropdownMenuItem
+                          onClick={handleSignOut}
+                          className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 text-red-600 cursor-pointer transition-all duration-200"
+                        >
+                          <div className="p-2 rounded-lg bg-red-100 text-red-600">
+                            <LogOut className="h-4 w-4" />
+                          </div>
+                          <span className="font-medium">{t("signOut") || "Sign Out"}</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </motion.div>
+                ) : (
+                  // Get Started Menu
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A] rounded-xl px-6 py-2 font-semibold shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                          {t("getStarted") || "Get Started"}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-48 p-2 rounded-2xl shadow-2xl border-0 bg-white/95 backdrop-blur-xl"
+                      >
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/login"
+                            className="flex items-center w-full p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition-all duration-200 font-medium"
+                          >
+                            {t("login") || "Login"}
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link
+                            href="/login?mode=signup"
+                            className="flex items-center w-full p-3 rounded-xl hover:bg-[#AFF8C8]/10 cursor-pointer transition-all duration-200 font-medium"
+                          >
+                            {t("register") || "Register"}
+                          </Link>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </motion.div>
+                )}
+
+                {/* Mobile Menu Button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="lg:hidden h-10 w-10 rounded-xl hover:bg-gray-100 transition-all duration-300"
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                >
+                  <AnimatePresence mode="wait">
+                    {isMobileMenuOpen ? (
+                      <motion.div
+                        key="close"
+                        initial={{ rotate: -90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: 90, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <X className="h-5 w-5" />
+                      </motion.div>
+                    ) : (
+                      <motion.div
+                        key="menu"
+                        initial={{ rotate: 90, opacity: 0 }}
+                        animate={{ rotate: 0, opacity: 1 }}
+                        exit={{ rotate: -90, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        <Menu className="h-5 w-5" />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </Button>
+              </nav>
+            </div>
           </div>
 
-          <nav className="hidden md:flex items-center gap-4">
-            <Link href="/explore" className="text-[#0F2830] hover:text-[#00D37F] text-sm font-medium">
-              {t("explore")}
-            </Link>
-            <Link href="/business" className="text-[#0F2830] hover:text-[#00D37F] text-sm font-medium">
-              {t("business")}
-            </Link>
-            
+          {/* Categories Navigation */}
+          <motion.div
+            className="border-t border-gray-100 bg-white/80 backdrop-blur-sm"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="container mx-auto px-4 py-3">
+              <CategoriesDropdown />
+            </div>
+          </motion.div>
 
-            {/* Show notifications and messages when user is logged in */}
-            {user && (
-              <>
-                <NotificationsDropdown />
-                <MessagesDropdown />
-              </>
-            )}
-
-            {loading ? (
-              <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse" />
-            ) : user ? (
-              // Show user profile when logged in
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                    <Avatar className="h-8 w-8">
-                      {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}
-                      <AvatarFallback className="bg-[#00D37F] text-white text-sm font-medium">
-                        {getUserInitials(user)}
-                      </AvatarFallback>
-                    </Avatar>
+          {/* Mobile Search Bar */}
+          <AnimatePresence>
+            {isMobileMenuOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="lg:hidden border-t border-gray-100 bg-white p-4"
+              >
+                <form onSubmit={handleSearch} className="relative">
+                  <Input
+                    type="text"
+                    placeholder={t("search") || "Search for services..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full h-12 pr-14 pl-6 rounded-2xl border-2 border-gray-200 focus:border-[#00D37F]"
+                    dir={isRtl ? "rtl" : "ltr"}
+                  />
+                  <Button
+                    type="submit"
+                    size="icon"
+                    className="absolute right-1 top-1 h-10 w-10 bg-[#00D37F] hover:bg-[#00B86A] text-white rounded-xl"
+                  >
+                    <Search className="h-5 w-5" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <div className="flex items-center justify-start gap-2 p-2">
-                    <div className="flex flex-col space-y-1 leading-none">
-                      <p className="font-medium">{user.user_metadata?.full_name || user.user_metadata?.name || "User"}</p>
-                      <p className="w-[200px] truncate text-sm text-muted-foreground">{user.email}</p>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/account" className="flex items-center">
-                      <UserIcon className="mr-2 h-4 w-4" />
-                      <span>{t("dashboard")}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/account" className="flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>{t("settings")}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowOnboarding(true)} className="flex items-center">
-                    <span>{t("becomeFreelancer")}</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="flex items-center text-red-600">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>{t("signOut")}</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              // Show Get Started button when not logged in
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button className="bg-[#00D37F] text-white hover:bg-[#00B86A]">{t("getStarted")}</Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
-                  <DropdownMenuItem asChild>
-                    <Link href="/login" className="flex items-center w-full">
-                      {t("login")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/login?mode=signup" className="flex items-center w-full">
-                      {t("register")}
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </form>
+              </motion.div>
             )}
-          </nav>
-
-          <Button variant="outline" size="icon" className="md:hidden">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="lucide lucide-menu"
-            >
-              <line x1="4" x2="20" y1="12" y2="12" />
-              <line x1="4" x2="20" y1="6" y2="6" />
-              <line x1="4" x2="20" y1="18" y2="18" />
-            </svg>
-          </Button>
-        </div>
-      </header>
-
-      {/* Categories Navigation */}
-      <div className="border-b border-gray-200">
-        <div className="container mx-auto px-4">
-          <CategoriesDropdown />
-        </div>
-      </div>
+          </AnimatePresence>
+        </header>
+      </motion.div>
 
       {/* Freelancer Onboarding Dialog */}
       <Dialog open={showOnboarding} onOpenChange={setShowOnboarding}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl border-0 shadow-2xl">
           <DialogTitle className="sr-only">Freelancer Onboarding</DialogTitle>
           <FreelancerOnboarding onClose={() => setShowOnboarding(false)} />
         </DialogContent>

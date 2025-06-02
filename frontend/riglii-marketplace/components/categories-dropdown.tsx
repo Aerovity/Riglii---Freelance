@@ -106,7 +106,7 @@ export default function CategoriesDropdown() {
                     {subcategories.map((subcategory) => (
                       <Link
                         key={subcategory}
-                        href={`/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
+                        href={`/category/${subcategory.toLowerCase().replace(/\s+/g, "-")}`}
                         className="block select-none space-y-1 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-[#AFF8C8]/10 hover:text-[#00D37F]"
                       >
                         {subcategory}

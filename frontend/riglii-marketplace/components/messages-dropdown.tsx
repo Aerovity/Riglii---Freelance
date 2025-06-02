@@ -305,7 +305,7 @@ export default function MessagesDropdown() {
               >
                 <Avatar className="h-10 w-10 mr-3">
                   {message.sender?.avatar_url && (
-                    <AvatarImage src={message.sender.avatar_url} />
+                    <AvatarImage src={message.sender.avatar_url || "/placeholder.svg"} />
                   )}
                   <AvatarFallback className="bg-[#AFF8C8] text-[#014751] text-sm">
                     {getUserInitials(message.sender?.full_name || '')}

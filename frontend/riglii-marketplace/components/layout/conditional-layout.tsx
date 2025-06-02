@@ -24,7 +24,8 @@ export default function ConditionalLayout({
   return (
     <div className="flex flex-col min-h-screen">
       <SiteHeader />
-      <main className="flex-grow relative z-10">
+      {/* Main content with padding to account for fixed header */}
+      <main className="flex-grow relative z-10 pt-[120px]">
         {children}
       </main>
       <SiteFooter />
