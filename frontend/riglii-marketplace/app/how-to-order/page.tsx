@@ -27,7 +27,7 @@ export default function HowToOrder() {
       title: "Browse & Search",
       content:
         "Explore thousands of services or use our smart search to find exactly what you need. Filter by category, price, delivery time, and seller rating to find the perfect match.",
-      image: "/placeholder.svg?height=400&width=600", // Suggest: Screenshot of search interface with filters and service listings
+      image: "/search.jpg", // Suggest: Screenshot of search interface with filters and service listings
       icon: <Search className="w-6 h-6 text-blue-600" />,
     },
     {
@@ -35,14 +35,14 @@ export default function HowToOrder() {
       title: "Contact the Seller",
       content:
         "Message the freelancer to discuss your project requirements, timeline, and any specific details. Most sellers respond within a few hours to help clarify your needs.",
-      image: "/placeholder.svg?height=400&width=600", // Suggest: Chat interface showing conversation between buyer and seller
+      image: "/disscusion.jpg", // Suggest: Chat interface showing conversation between buyer and seller
       icon: <MessageSquare className="w-6 h-6 text-green-600" />,
     },
     {
       id: 3,
       title: "Place Your Order",
       content: "Choose the right package for your needs and make a secure payment.",
-      image: "/placeholder.svg?height=400&width=600", // Suggest: Order form with package selection and secure payment options
+      image: "/place-order.jpg", // Suggest: Order form with package selection and secure payment options
       icon: <CreditCard className="w-6 h-6 text-purple-600" />,
     },
     {
@@ -50,7 +50,7 @@ export default function HowToOrder() {
       title: "Track Progress",
       content:
         "Stay updated with real-time progress updates from your freelancer. Communicate through our platform and request revisions if needed during the process.",
-      image: "/placeholder.svg?height=400&width=600", // Suggest: Project dashboard showing progress timeline and milestones
+      image: "/track.jpg", // Suggest: Project dashboard showing progress timeline and milestones
       icon: <Clock className="w-6 h-6 text-orange-600" />,
     },
     {
@@ -58,7 +58,7 @@ export default function HowToOrder() {
       title: "Receive & Review",
       content:
         "Get your completed project delivered on time. Review the work, request any final changes, and leave a review to help other buyers make informed decisions.",
-      image: "/placeholder.svg?height=400&width=600", // Suggest: Delivery notification with completed work and review interface
+      image: "review.jpg", // Suggest: Delivery notification with completed work and review interface
       icon: <CheckCircle className="w-6 h-6 text-green-600" />,
     },
   ]

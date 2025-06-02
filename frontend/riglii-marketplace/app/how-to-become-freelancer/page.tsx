@@ -34,7 +34,7 @@ export default function HowToBecomeFreelancer() {
       title: "Build Your Portfolio",
       content:
         "Upload your best work samples and case studies. Show potential clients what you can deliver by displaying high-quality examples of your previous projects.",
-      image: "/freelancer-workspace.jpg",
+      image: "/portfolio-template.jpg",
       icon: <FileText className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -42,7 +42,7 @@ export default function HowToBecomeFreelancer() {
       title: "Set Your Rates",
       content:
         "Research market rates and set competitive pricing for your services. Start with competitive rates to build your reputation, then increase as you gain more reviews.",
-      image: "/freelancer-workspace.jpg",
+      image: "/set-price.jpg",
       icon: <DollarSign className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -50,7 +50,7 @@ export default function HowToBecomeFreelancer() {
       title: "Get Your First Reviews",
       content:
         "Deliver exceptional work to your first clients to earn 5-star reviews. Great reviews are crucial for attracting more clients and building your reputation on the platform.",
-      image: "/freelancer-workspace.jpg",
+      image: "/first-review.jpg",
       icon: <Star className="w-6 h-6 text-[#00D37F]" />,
     },
     {
@@ -58,7 +58,7 @@ export default function HowToBecomeFreelancer() {
       title: "Scale Your Business",
       content:
         "As you gain experience and positive reviews, you can increase your rates, take on bigger projects, and build long-term relationships with clients.",
-      image: "/freelancer-workspace.jpg",
+      image: "/scale-up.jpg",
       icon: <TrendingUp className="w-6 h-6 text-[#00D37F]" />,
     },
   ]

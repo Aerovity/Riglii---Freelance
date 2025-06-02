@@ -366,23 +366,6 @@ export default function SiteHeader() {
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="my-2" />
                         <DropdownMenuItem
-                          onClick={() => setShowOnboarding(true)}
-                          className="flex items-center gap-3 p-3 rounded-xl hover:bg-[#AFF8C8]/10 cursor-pointer transition-all duration-200"
-                        >
-                          <div className="p-2 rounded-lg bg-[#AFF8C8]/20 text-[#00D37F]">
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M13 10V3L4 14h7v7l9-11h-7z"
-                              />
-                            </svg>
-                          </div>
-                          <span className="font-medium">{t("becomeFreelancer") || "Become Freelancer"}</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator className="my-2" />
-                        <DropdownMenuItem
                           onClick={handleSignOut}
                           className="flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 text-red-600 cursor-pointer transition-all duration-200"
                         >
