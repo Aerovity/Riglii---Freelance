@@ -24,7 +24,7 @@ import {
   CreditCard,
   CheckCircle,
 } from "lucide-react"
-import ReviewForm from "../../../messaging-system/components/Forms/ReviewForm"
+import ReviewForm from "@/messaging-system/components/Forms/ReviewForm"
 
 interface FreelancerProfile {
   id: string
@@ -178,6 +178,7 @@ export default function FreelancerProfileView({
   const [eligibleForm, setEligibleForm] = useState<any>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [hasReviewed, setHasReviewed] = useState(false)
+  const [isOwnProfile, setIsOwnProfile] = useState(false)
   const supabase = createClient()
 
   // Calculate review statistics
@@ -248,6 +249,9 @@ export default function FreelancerProfileView({
       }
 
       setCurrentUserId(user.id)
+      
+      // Check if viewing own profile
+      setIsOwnProfile(user.id === profile.user_id)
 
       // Check for completed projects with this freelancer
       const { data: forms, error } = await supabase
@@ -474,6 +478,64 @@ export default function FreelancerProfileView({
     window.location.reload()
   }
 
+  const handleContactFreelancer = async () => {
+    try {
+      // Get current user
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        // Redirect to login if not authenticated
+        window.location.href = '/login'
+        return
+      }
+
+      // Check if conversation already exists
+      const { data: existingConversation, error: convError } = await supabase
+        .from("conversations")
+        .select("*")
+        .or(`and(user1_id.eq.${user.id},user2_id.eq.${profile.user_id}),and(user1_id.eq.${profile.user_id},user2_id.eq.${user.id})`)
+        .maybeSingle()
+
+      if (convError && convError.code !== 'PGRST116') {
+        console.error('Error checking conversation:', convError)
+        return
+      }
+
+      let conversationId: string
+
+      if (existingConversation) {
+        conversationId = existingConversation.id
+      } else {
+        // Create new conversation
+        const { data: newConversation, error: createError } = await supabase
+          .from("conversations")
+          .insert([
+            {
+              user1_id: user.id,
+              user2_id: profile.user_id,
+            },
+          ])
+          .select()
+          .single()
+
+        if (createError) {
+          console.error('Error creating conversation:', createError)
+          return
+        }
+
+        conversationId = newConversation.id
+      }
+
+      // Redirect to messages with conversation ID
+      window.location.href = `/messages?conversation=${conversationId}`
+    } catch (error) {
+      console.error('Error handling contact:', error)
+    }
+  }
+
   const reviewStats = calculateReviewStats()
 
   return (
@@ -531,15 +593,26 @@ export default function FreelancerProfileView({
 
                     {/* Action Buttons */}
                     <div className="space-y-3">
-                      <Button className="w-full bg-[#00D37F] hover:bg-[#00c070] text-white">Contact Freelancer</Button>
+                      {isOwnProfile ? (
+                        <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 text-center">
+                          <p className="text-gray-600 text-sm">This is your profile</p>
+                        </div>
+                      ) : (
+                        <Button 
+                          className="w-full bg-[#00D37F] hover:bg-[#00c070] text-white"
+                          onClick={handleContactFreelancer}
+                        >
+                          Contact Freelancer
+                        </Button>
+                      )}
 
                       {/* Review Button for eligible clients */}
-                      {canReview && (
+                      {canReview && !isOwnProfile && (
                         <Button
                           onClick={() => setShowReviewForm(true)}
                           className={`w-full ${hasReviewed ? "bg-gray-600 hover:bg-gray-700" : "bg-blue-600 hover:bg-blue-700"} text-white`}
                         >
-                          <Star className="w-4 w-4 mr-2" />
+                          <Star className="w-4 h-4 mr-2" />
                           {hasReviewed ? "Update Your Review" : "Leave a Review"}
                         </Button>
                       )}

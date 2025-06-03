@@ -432,7 +432,7 @@ export default function Home() {
               <h2 className="text-2xl font-bold text-[#0F2830] mb-2">{t("getInspired") || "Featured Freelancers"}</h2>
               <p className="text-gray-600">Discover talented professionals ready to bring your projects to life</p>
             </div>
-            <Link href="/category/browse" className="text-[#00D37F] font-medium text-sm hover:underline">
+            <Link href="/category/*" className="text-[#00D37F] font-medium text-sm hover:underline">
               View All Freelancers
             </Link>
           </div>
