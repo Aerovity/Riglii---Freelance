@@ -223,7 +223,7 @@ export default function SignInPage() {
                                     id="password"
                                     type={showPassword ? "text" : "password"}
                                     required
-                                    placeholder="••••••••"
+                                    placeholder="Enter your password"
                                     className="pr-10"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
@@ -257,7 +257,7 @@ export default function SignInPage() {
                                     id="confirmPassword"
                                     type={showPassword ? "text" : "password"}
                                     required
-                                    placeholder="••••••••"
+                                    placeholder="Confirm your password"
                                     className="mt-1"
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
