@@ -265,12 +265,14 @@ export default function Home() {
                       NEW
                     </span>
                   </div>
+                  <Link href="/login">
                   <Button
                     variant="outline"
                     className="text-[#014751] border-[#014751] hover:bg-[#014751] hover:text-white"
                   >
                     {t("getStarted")}
                   </Button>
+                  </Link>
                 </div>
                 <p className="text-sm text-gray-600">{t("getTailored")}</p>
               </div>
@@ -304,12 +306,14 @@ export default function Home() {
                   <div>
                     <h3 className="font-semibold text-[#0F2830]">{t("tailorRiglii")}</h3>
                   </div>
+                  <Link href="/login">
                   <Button
                     variant="outline"
                     className="text-[#014751] border-[#014751] hover:bg-[#014751] hover:text-white"
                   >
                     {t("addInfo")}
                   </Button>
+                  </Link>
                 </div>
                 <p className="text-sm text-gray-600">{t("tellUs")}</p>
               </div>
