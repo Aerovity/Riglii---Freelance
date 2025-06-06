@@ -104,13 +104,6 @@ export default function HowToOrder() {
     },
   ]
 
-  const stats = [
-    { number: "10M+", label: "Orders Completed" },
-    { number: "99.9%", label: "Uptime Guarantee" },
-    { number: "4.9/5", label: "Average Rating" },
-    { number: "< 24h", label: "Average Response Time" },
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       {/* Header Section */}
@@ -150,23 +143,6 @@ export default function HowToOrder() {
                 Watch Demo
               </Button>
             </div>
-          </motion.div>
-
-          {/* Stats Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16"
-          >
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent mb-2">
-                  {stat.number}
-                </div>
-                <div className="text-gray-600 font-medium">{stat.label}</div>
-              </div>
-            ))}
           </motion.div>
         </div>
       </section>
@@ -255,7 +231,7 @@ export default function HowToOrder() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 px-4 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600">
+      <Link href="/contact-support"><section className="py-20 px-4 bg-gradient-to-r from-green-600 via-blue-600 to-purple-600">
         <div className="container mx-auto max-w-4xl text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">Ready to Get Started?</h2>
@@ -264,7 +240,7 @@ export default function HowToOrder() {
               work, delivered on time.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="category/*">
+              <Link href="/category/*">
                 <Button
                   size="lg"
                   className="bg-white text-green-600 hover:bg-gray-100 px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 font-semibold"
@@ -283,7 +259,7 @@ export default function HowToOrder() {
             </div>
           </motion.div>
         </div>
-      </section>
+      </section></Link>
 
       {/* Help Section */}
       <section className="py-16 px-4 bg-white">

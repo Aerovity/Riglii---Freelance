@@ -81,13 +81,6 @@ export default function HowToBecomeFreelancer() {
     },
   ]
 
-  const stats = [
-    { number: "2M+", label: "Active Freelancers" },
-    { number: "$1B+", label: "Paid to Freelancers" },
-    { number: "95%", label: "Client Satisfaction" },
-    { number: "24/7", label: "Support Available" },
-  ]
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50">
       {/* Header Section */}
@@ -123,21 +116,6 @@ export default function HowToBecomeFreelancer() {
                 Watch Tutorial
               </Button>
             </div>
-          </motion.div>
-
-          {/* Stats Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.2 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16"
-          >
-            {stats.map((stat, index) => (
-              <div key={index} className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-[#00D37F] mb-2">{stat.number}</div>
-                <div className="text-gray-600 font-medium">{stat.label}</div>
-              </div>
-            ))}
           </motion.div>
         </div>
       </section>

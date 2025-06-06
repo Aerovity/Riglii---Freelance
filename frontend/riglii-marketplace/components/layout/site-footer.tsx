@@ -17,27 +17,27 @@ export default function SiteFooter() {
             <h3 className="font-bold mb-4">{t("categories")}</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="/graphics-design" className="hover:text-[#00D37F]">
+                <Link href="/category/graphics-design" className="hover:text-[#00D37F]">
                   Graphics & Design
                 </Link>
               </li>
               <li>
-                <Link href="/digital-marketing" className="hover:text-[#00D37F]">
+                <Link href="/category/digital-marketing" className="hover:text-[#00D37F]">
                   Digital Marketing
                 </Link>
               </li>
               <li>
-                <Link href="/writing-translation" className="hover:text-[#00D37F]">
+                <Link href="/category/writing-translation" className="hover:text-[#00D37F]">
                   Writing & Translation
                 </Link>
               </li>
               <li>
-                <Link href="/video-animation" className="hover:text-[#00D37F]">
+                <Link href="/category/video-animation" className="hover:text-[#00D37F]">
                   Video & Animation
                 </Link>
               </li>
               <li>
-                <Link href="/music-audio" className="hover:text-[#00D37F]">
+                <Link href="/category/music-audio" className="hover:text-[#00D37F]">
                   Music & Audio
                 </Link>
               </li>
@@ -48,27 +48,27 @@ export default function SiteFooter() {
             <h3 className="font-bold mb-4">{t("about")}</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/terms" className="hover:text-[#00D37F]">
                   Careers
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/terms" className="hover:text-[#00D37F]">
                   Press & News
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/terms" className="hover:text-[#00D37F]">
                   Partnerships
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/terms" className="hover:text-[#00D37F]">
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/terms" className="hover:text-[#00D37F]">
                   Terms of Service
                 </Link>
               </li>
@@ -79,22 +79,22 @@ export default function SiteFooter() {
             <h3 className="font-bold mb-4">{t("support")}</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/contact-support" className="hover:text-[#00D37F]">
                   Help & Support
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/contact-support" className="hover:text-[#00D37F]">
                   Trust & Safety
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/contact-support" className="hover:text-[#00D37F]">
                   Selling on Riglii
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="/contact-support" className="hover:text-[#00D37F]">
                   Buying on Riglii
                 </Link>
               </li>
@@ -105,27 +105,22 @@ export default function SiteFooter() {
             <h3 className="font-bold mb-4">{t("community")}</h3>
             <ul className="space-y-2 text-sm text-gray-300">
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="https://www.instagram.com/riglii.dz" className="hover:text-[#00D37F]">
                   Events
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="https://www.instagram.com/riglii.dz" className="hover:text-[#00D37F]">
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="https://www.instagram.com/riglii.dz" className="hover:text-[#00D37F]">
                   Forum
                 </Link>
               </li>
               <li>
-                <Link href="#" className="hover:text-[#00D37F]">
-                  Podcast
-                </Link>
-              </li>
-              <li>
-                <Link href="#" className="hover:text-[#00D37F]">
+                <Link href="https://www.instagram.com/riglii.dz" className="hover:text-[#00D37F]">
                   Affiliates
                 </Link>
               </li>
@@ -155,7 +150,7 @@ export default function SiteFooter() {
           </div>
 
           <div className="flex items-center gap-4">
-            <Link href="#" className="text-gray-400 hover:text-white">
+            <Link href="https://www.instagram.com/riglii.dz" className="text-gray-400 hover:text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -171,7 +166,7 @@ export default function SiteFooter() {
                 <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
               </svg>
             </Link>
-            <Link href="#" className="text-gray-400 hover:text-white">
+            <Link href="https://www.instagram.com/riglii.dz" className="text-gray-400 hover:text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -187,7 +182,7 @@ export default function SiteFooter() {
                 <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
               </svg>
             </Link>
-            <Link href="#" className="text-gray-400 hover:text-white">
+            <Link href="https://www.instagram.com/riglii.dz" className="text-gray-400 hover:text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -205,7 +200,7 @@ export default function SiteFooter() {
                 <circle cx="4" cy="4" r="2" />
               </svg>
             </Link>
-            <Link href="#" className="text-gray-400 hover:text-white">
+            <Link href="https://www.instagram.com/riglii.dz" className="text-gray-400 hover:text-white">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
