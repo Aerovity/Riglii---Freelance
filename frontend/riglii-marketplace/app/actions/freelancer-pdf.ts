@@ -1,6 +1,7 @@
 "use server"
 
 import puppeteer from "puppeteer"
+import type { Browser } from "puppeteer"
 import * as nodemailer from "nodemailer"
 
 
@@ -662,13 +663,12 @@ async function sendEmailWithRetry(
  * Generates PDF using Puppeteer with enhanced error handling
  */
 async function generatePDF(htmlContent: string): Promise<Buffer> {
-  let browser: puppeteer.Browser | null = null
-  
+  let browser: Browser | null = null;
+
   try {
-    
     // Launch Puppeteer with optimized settings for server environments
     browser = await puppeteer.launch({
-      headless: 'new', // Use new headless mode
+      headless: true, // Use headless mode
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -688,28 +688,25 @@ async function generatePDF(htmlContent: string): Promise<Buffer> {
       ],
       timeout: 30000,
       protocolTimeout: 30000,
-    })
+    });
 
+    const page = await browser.newPage();
 
-    const page = await browser.newPage()
-    
     // Set viewport and emulate screen for better rendering
-    await page.setViewport({ width: 1200, height: 800 })
-    await page.emulateMediaType('screen')
+    await page.setViewport({ width: 1200, height: 800 });
+    await page.emulateMediaType('screen');
 
-    
     // Set content with proper wait conditions
     await page.setContent(htmlContent, { 
       waitUntil: ["load", "domcontentloaded", "networkidle0"],
       timeout: 30000
-    })
+    });
 
     // Additional wait for rendering
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
-    
     // Generate PDF with enhanced settings
-    const pdfBuffer = await page.pdf({
+    const pdfUint8Array = await page.pdf({
       format: "A4",
       printBackground: true,
       margin: {
@@ -722,25 +719,23 @@ async function generatePDF(htmlContent: string): Promise<Buffer> {
       timeout: 30000,
       displayHeaderFooter: false,
       scale: 0.8, // Slightly reduce scale for better fit
-    })
+    });
 
-    
     // Close browser
-    await browser.close()
-    browser = null
+    await browser.close();
+    browser = null;
 
-    return pdfBuffer
+    // Ensure the result is a Node.js Buffer
+    return Buffer.from(pdfUint8Array);
   } catch (error) {
-    
     // Ensure browser is closed even if an error occurs
     if (browser) {
       try {
-        await browser.close()
+        await browser.close();
       } catch (closeError) {
       }
     }
-    
-    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }
 
