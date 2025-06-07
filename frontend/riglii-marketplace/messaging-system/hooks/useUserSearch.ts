@@ -8,21 +8,16 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
   const supabase = createClient()
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // Helper to get avatar URL without fetching
-  const getAvatarUrl = (userId: string): string | undefined => {
-    // Instead of fetching, construct the public URL
-    // This avoids 400 errors for missing avatars
-    return undefined // We'll skip avatars for now to make it smooth
-  }
-
   const fetchRecommendedUsers = useCallback(async () => {
-    if (isCurrentUserFreelancer === null || searching) {
+    if (isCurrentUserFreelancer === null || !currentUserId) {
+      console.log('Missing user info for recommendations')
       return
     }
 
     try {
       setSearching(true)
       
+      // Fetch opposite type users (clients for freelancers, freelancers for clients)
       const { data: users, error } = await supabase
         .from('users')
         .select(`
@@ -42,9 +37,12 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
         .limit(10)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        console.error('Error fetching recommended users:', error)
+        throw error
+      }
 
-      // Process users without fetching avatars
+      // Process users
       const results: PublicUser[] = (users || []).map(userData => {
         let fullName = userData.email.split('@')[0]
         let avatarUrl = undefined
@@ -54,7 +52,6 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
           fullName = profile.display_name || 
                     `${profile.first_name || ''} ${profile.last_name || ''}`.trim() ||
                     fullName
-          // Use profile picture URL if available
           avatarUrl = profile.profile_picture_url
         }
 
@@ -67,6 +64,7 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
         }
       })
 
+      console.log(`Found ${results.length} recommended users`)
       setSearchResults(results)
     } catch (error) {
       console.error('Error fetching users:', error)
@@ -74,10 +72,11 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
     } finally {
       setSearching(false)
     }
-  }, [currentUserId, isCurrentUserFreelancer, searching])
+  }, [currentUserId, isCurrentUserFreelancer, supabase])
 
   const searchUsers = useCallback(async (query: string) => {
-    if (isCurrentUserFreelancer === null) {
+    if (isCurrentUserFreelancer === null || !currentUserId) {
+      console.log('Missing user info for search')
       return
     }
 
@@ -91,15 +90,15 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
       return
     }
 
-    // Debounce the search to make it smoother
+    // Debounce the search
     searchTimeoutRef.current = setTimeout(async () => {
       try {
         setSearching(true)
         
         const targetType = !isCurrentUserFreelancer
         
-        // Search in users table
-        const { data: users, error } = await supabase
+        // Build the query
+        let queryBuilder = supabase
           .from('users')
           .select(`
             id,
@@ -114,47 +113,71 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
             )
           `)
           .eq('is_freelancer', targetType)
-          .ilike('email', `%${query}%`)
           .neq('id', currentUserId)
           .limit(20)
 
-        if (error) throw error
+        // For email search
+        const { data: emailResults, error: emailError } = await queryBuilder
+          .ilike('email', `%${query}%`)
 
-        let combinedResults = [...(users || [])]
+        if (emailError) {
+          console.error('Email search error:', emailError)
+          throw emailError
+        }
+
+        let combinedResults = [...(emailResults || [])]
         
         // If searching for freelancers, also search in profiles
         if (targetType === true) {
-          const { data: profileSearchResults } = await supabase
-            .from('users')
+          // Search in freelancer profiles separately
+          const { data: profileResults } = await supabase
+            .from('freelancer_profiles')
             .select(`
-              id,
-              email,
-              is_freelancer,
-              freelancer_profiles!inner (
-                display_name,
-                occupation,
-                first_name,
-                last_name,
-                profile_picture_url
-              )
+              user_id,
+              display_name,
+              occupation,
+              first_name,
+              last_name,
+              profile_picture_url
             `)
-            .eq('is_freelancer', true)
-            .neq('id', currentUserId)
-            .or(`freelancer_profiles.display_name.ilike.%${query}%,freelancer_profiles.first_name.ilike.%${query}%,freelancer_profiles.last_name.ilike.%${query}%`, { foreignTable: 'freelancer_profiles' })
+            .or(`display_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
             .limit(20)
 
-          if (profileSearchResults) {
-            // Merge without duplicates
-            const existingIds = new Set(combinedResults.map(u => u.id))
-            profileSearchResults.forEach(user => {
-              if (!existingIds.has(user.id)) {
-                combinedResults.push(user)
+          if (profileResults) {
+            // Get user data for these profiles
+            const userIds = profileResults.map(p => p.user_id).filter(id => id !== currentUserId)
+            if (userIds.length > 0) {
+              const { data: usersFromProfiles } = await supabase
+                .from('users')
+                .select(`
+                  id,
+                  email,
+                  is_freelancer,
+                  freelancer_profiles (
+                    display_name,
+                    occupation,
+                    first_name,
+                    last_name,
+                    profile_picture_url
+                  )
+                `)
+                .in('id', userIds)
+                .eq('is_freelancer', true)
+
+              if (usersFromProfiles) {
+                // Merge without duplicates
+                const existingIds = new Set(combinedResults.map(u => u.id))
+                usersFromProfiles.forEach(user => {
+                  if (!existingIds.has(user.id)) {
+                    combinedResults.push(user)
+                  }
+                })
               }
-            })
+            }
           }
         }
 
-        // Process results without fetching avatars
+        // Process results
         const results: PublicUser[] = combinedResults.map(userData => {
           let fullName = userData.email.split('@')[0]
           let avatarUrl = undefined
@@ -176,6 +199,7 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
           }
         })
 
+        console.log(`Search found ${results.length} users`)
         setSearchResults(results)
       } catch (error) {
         console.error('Search error:', error)
@@ -184,7 +208,7 @@ export const useUserSearch = (currentUserId: string, isCurrentUserFreelancer: bo
         setSearching(false)
       }
     }, 300) // 300ms debounce
-  }, [currentUserId, isCurrentUserFreelancer, fetchRecommendedUsers])
+  }, [currentUserId, isCurrentUserFreelancer, fetchRecommendedUsers, supabase])
 
   return {
     searchResults,

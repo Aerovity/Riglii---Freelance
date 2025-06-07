@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { FileText, Send, Loader2, DollarSign, Clock, Receipt } from "lucide-react"
+import { FileText, Send, Loader2, Clock, Receipt } from "lucide-react"
 import type { FormData } from "../../types"
 import { validateFormData } from "../../utils/validations"
 import { sendProposalReceivedEmail } from "@/app/actions/emails"
@@ -371,18 +371,20 @@ export default function OfferForm({
                 {isFreelancer ? 'Total Price (DZD)' : 'Budget (DZD)'}
               </Label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   id="price"
                   type="number"
                   step="0.01"
                   min="0"
-                  placeholder="100.00"
+                  placeholder="10000"
                   value={formData.price}
                   onChange={(e) => setFormData((prev) => ({ ...prev, price: e.target.value }))}
-                  className="pl-10"
+                  className="pr-12"
                   disabled={loading}
                 />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm font-medium">
+                  DZD
+                </span>
               </div>
             </div>
 

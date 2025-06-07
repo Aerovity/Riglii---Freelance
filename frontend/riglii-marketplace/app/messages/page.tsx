@@ -11,10 +11,16 @@ export default async function MessagesPage() {
     redirect('/login')
   }
 
+  // Ensure user.email is defined before rendering MessagingSystem
+  if (!user.email) {
+    // Optionally, redirect or show an error if email is missing
+    redirect('/login');
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Messages</h1>
-      <MessagingSystem user={user} />
+      <MessagingSystem user={{ id: user.id, email: user.email }} />
     </div>
   )
 }

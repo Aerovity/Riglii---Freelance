@@ -19,9 +19,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, MoreVertical, Phone, Video, Trash2, User, MessageSquare } from "lucide-react"
+import { ArrowLeft, MoreVertical, Trash2, User, MessageSquare } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
+import { useAvatar } from "../../hooks/useAvatar"
 
 interface Conversation {
   id: string
@@ -65,6 +66,9 @@ export default function MessageHeader({
   const [isRemoving, setIsRemoving] = useState(false)
   const [showRemoveDialog, setShowRemoveDialog] = useState(false)
   const supabase = createClient()
+
+  // Use the improved avatar hook for participant's avatar
+  const { avatarUrl: participantAvatarUrl } = useAvatar(conversation.participant.id)
 
   const handleProfileClick = () => {
     if (conversation.participant.is_freelancer) {
@@ -135,9 +139,10 @@ export default function MessageHeader({
               >
                 <div className="relative">
                   <Avatar className="h-11 w-11 ring-2 ring-white shadow-sm">
-                    {conversation.participant.avatar_url && (
-                      <AvatarImage src={conversation.participant.avatar_url || "/placeholder.svg"} />
-                    )}
+                    <AvatarImage 
+                      src={participantAvatarUrl || undefined} 
+                      alt={`${conversation.participant.full_name}'s avatar`}
+                    />
                     <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
                       {getUserInitials(conversation.participant.full_name)}
                     </AvatarFallback>
@@ -162,22 +167,6 @@ export default function MessageHeader({
 
             {/* Right section - Action buttons */}
             <div className="flex items-center gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-10 w-10 rounded-full hover:bg-white/80 transition-colors group"
-              >
-                <Phone className="h-4 w-4 text-gray-600 group-hover:text-blue-600 transition-colors" />
-              </Button>
-
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-10 w-10 rounded-full hover:bg-white/80 transition-colors group"
-              >
-                <Video className="h-4 w-4 text-gray-600 group-hover:text-blue-600 transition-colors" />
-              </Button>
-
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button

@@ -62,6 +62,14 @@ export default function MessageInput({
   
   // Check if project has been submitted
   const projectSubmitted = acceptedCommercialForm?.form?.project_submitted
+  const projectSubmittedAt = acceptedCommercialForm?.form?.project_submitted_at
+
+  // Calculate days since project submission
+  const daysSinceSubmission = projectSubmittedAt 
+    ? Math.floor((Date.now() - new Date(projectSubmittedAt).getTime()) / (1000 * 60 * 60 * 24))
+    : 0
+  const daysRemaining = Math.max(0, 3 - daysSinceSubmission)
+  const conversationClosed = projectSubmitted && daysRemaining === 0
 
   // Determine if freelancer can send commercial forms
   const canSendCommercialForm = isCurrentUserFreelancer && 
@@ -96,48 +104,43 @@ export default function MessageInput({
     checkExistingReview()
   }, [acceptedCommercialForm?.form?.id, currentUserId, isCurrentUserFreelancer, projectSubmitted, supabase])
 
-  // Determine conversation state
-  const getConversationState = () => {
-    if (!isCurrentUserFreelancer) {
-      // Client flow
-      if (!proposalForms.length) return 'need_proposal'
-      if (!acceptedProposal) return 'waiting_proposal_response'
-      if (pendingCommercialForm) return 'commercial_pending'
-      if (acceptedCommercialForm && !projectSubmitted) return 'awaiting_project'
-      if (projectSubmitted) return 'project_completed'
-      return 'active'
-    } else {
-      // Freelancer flow
-      if (!acceptedProposal) {
-        const pendingProposal = proposalForms.find(m => m.form?.status === 'pending')
-        return pendingProposal ? 'proposal_pending' : 'no_proposal'
-      }
-      if (pendingCommercialForm) return 'commercial_sent'
-      if (projectSubmitted) return 'project_completed'
-      return 'active'
-    }
+  // SIMPLIFIED MESSAGE SENDING LOGIC:
+  // 1. Block if no accepted proposal (conversation not opened)
+  // 2. Block if conversation is closed (3+ days after project submission)
+  // 3. Allow everything else
+  const canSendMessage = () => {
+    // Block if no accepted proposal
+    if (!acceptedProposal) return false
+    
+    // Block if conversation is closed (3+ days after project submission)
+    if (conversationClosed) return false
+    
+    // Allow all other cases
+    return true
   }
 
-  const conversationState = getConversationState()
-
-  // Determine if messages can be sent
-  const canSendMessage = () => {
-    if (acceptedProposal) {
-      if (pendingCommercialForm) {
-        return isCurrentUserFreelancer
-      }
-      return true
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
     }
-    return false
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!message.trim() || !canSendMessage()) return
+    if ((!message.trim() && !selectedFile) || !canSendMessage()) return
 
-    await onSendMessage(message, selectedFile || undefined)
-    setMessage("")
-    setSelectedFile(null)
+    try {
+      await onSendMessage(message || "", selectedFile || undefined)
+      setMessage("")
+      setSelectedFile(null)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ""
+      }
+    } catch (error) {
+      console.error("Error sending message:", error)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -149,84 +152,45 @@ export default function MessageInput({
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setSelectedFile(file)
-    }
+  // CLIENT: Show proposal requirement if no accepted proposal
+  if (!isCurrentUserFreelancer && !acceptedProposal) {
+    return (
+      <div className="p-4 border-t bg-yellow-50 border-yellow-200">
+        <div className="flex flex-col items-center justify-center space-y-3">
+          <FileText className="h-8 w-8 text-yellow-600" />
+          <p className="text-sm font-medium text-yellow-800 text-center">
+            You must send a project proposal to start the conversation
+          </p>
+          <OfferForm
+            conversationId={conversation.id}
+            receiverId={conversation.participant.id}
+            senderId={currentUserId!}
+            isFreelancer={false}
+            onFormSent={onFormSent}
+            trigger={
+              <Button className="bg-yellow-600 hover:bg-yellow-700 text-white">
+                Create Project Proposal
+              </Button>
+            }
+          />
+        </div>
+      </div>
+    )
   }
 
-  // Render different states for clients
-  if (!isCurrentUserFreelancer) {
-    if (conversationState === 'need_proposal') {
-      return (
-        <div className="p-4 border-t bg-yellow-50 border-yellow-200">
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <FileText className="h-8 w-8 text-yellow-600" />
-            <p className="text-sm font-medium text-yellow-800 text-center">
-              You must send a project proposal to start the conversation
-            </p>
-            <OfferForm
-              conversationId={conversation.id}
-              receiverId={conversation.participant.id}
-              senderId={currentUserId!}
-              isFreelancer={false}
-              onFormSent={onFormSent}
-              trigger={
-                <Button className="bg-yellow-600 hover:bg-yellow-700 text-white">
-                  Create Project Proposal
-                </Button>
-              }
-            />
-          </div>
-        </div>
-      )
-    }
-
-    if (conversationState === 'waiting_proposal_response') {
-      return (
-        <div className="p-4 border-t bg-gray-50">
-          <div className="text-center text-gray-500">
-            <p className="text-sm">Waiting for freelancer to respond to your proposal...</p>
-          </div>
-        </div>
-      )
-    }
-
-    if (conversationState === 'commercial_pending') {
-      return (
-        <div className="p-4 border-t bg-orange-50">
-          <div className="text-center text-orange-700">
-            <p className="text-sm">Please review the commercial form above</p>
-          </div>
-        </div>
-      )
-    }
-
-    if (conversationState === 'awaiting_project') {
-      return (
-        <div className="p-4 border-t bg-yellow-50">
-          <div className="text-center text-yellow-700">
-            <p className="text-sm">Waiting for freelancer to deliver the project...</p>
-          </div>
-        </div>
-      )
-    }
-  }
-
-  // Render different states for freelancers
-  if (isCurrentUserFreelancer) {
-    if (conversationState === 'proposal_pending') {
+  // FREELANCER: Show accept/refuse requirement if no accepted proposal
+  if (isCurrentUserFreelancer && !acceptedProposal) {
+    const pendingProposal = proposalForms.find(m => m.form?.status === 'pending')
+    
+    if (pendingProposal) {
       return (
         <div className="p-4 border-t bg-blue-50">
           <div className="text-center text-blue-700">
-            <p className="text-sm">Please accept or refuse the proposal above to continue the conversation</p>
+            <p className="text-sm">Please accept or refuse the proposal above to start the conversation</p>
           </div>
         </div>
       )
-    }
-
-    if (conversationState === 'no_proposal') {
+    } else {
       return (
         <div className="p-4 border-t bg-gray-50">
           <div className="text-center text-gray-500">
@@ -235,31 +199,35 @@ export default function MessageInput({
         </div>
       )
     }
-
-    if (conversationState === 'commercial_sent') {
-      return (
-        <div className="p-4 border-t bg-orange-50">
-          <div className="text-center text-orange-700">
-            <p className="text-sm">Waiting for client to respond to your commercial form...</p>
-            <p className="text-xs mt-1">You can continue sending messages</p>
-          </div>
-        </div>
-      )
-    }
   }
 
-  if (conversationState === 'project_completed') {
-    // Calculate days since project submission
-    const submittedAt = acceptedCommercialForm?.form?.project_submitted_at
-    const daysSinceSubmission = submittedAt 
-      ? Math.floor((Date.now() - new Date(submittedAt).getTime()) / (1000 * 60 * 60 * 24))
-      : 0
-    const daysRemaining = Math.max(0, 3 - daysSinceSubmission)
+  // CONVERSATION CLOSED: Show closed state
+  if (conversationClosed) {
+    return (
+      <div className="p-4 border-t">
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-red-600" />
+            <div>
+              <p className="text-sm font-medium text-red-800">
+                Conversation is closed
+              </p>
+              <p className="text-xs text-red-600 mt-1">
+                This conversation was automatically closed 3 days after project delivery
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
+  // PROJECT COMPLETED: Show completed state with review option
+  if (projectSubmitted) {
     return (
       <>
         <form onSubmit={handleSubmit} className="p-4 border-t">
-          {/* Project completed banner with review button for clients */}
+          {/* Project completed banner */}
           <div className="mb-3 p-3 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -268,15 +236,9 @@ export default function MessageInput({
                   <p className="text-sm font-medium text-green-800">
                     Project has been delivered ✅
                   </p>
-                  {daysRemaining > 0 ? (
-                    <p className="text-xs text-green-600 mt-1">
-                      Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-red-600 mt-1">
-                      Conversation is closed
-                    </p>
-                  )}
+                  <p className="text-xs text-green-600 mt-1">
+                    Conversation will close in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}
+                  </p>
                 </div>
               </div>
               
@@ -295,7 +257,7 @@ export default function MessageInput({
             </div>
           </div>
 
-          {selectedFile && daysRemaining > 0 && (
+          {selectedFile && (
             <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
               <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
               <Button
@@ -315,8 +277,8 @@ export default function MessageInput({
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={daysRemaining > 0 ? "Type a message..." : "Conversation is closed"}
-                disabled={sending || daysRemaining === 0}
+                placeholder="Type a message..."
+                disabled={sending}
                 className="resize-none pr-10 min-h-[44px] max-h-32"
                 rows={1}
               />
@@ -327,7 +289,7 @@ export default function MessageInput({
               type="file"
               className="hidden"
               onChange={handleFileSelect}
-              accept="image/*,.pdf,.doc,.docx,.txt"
+              accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar,.mp4,.mp3,.xls,.xlsx,.ppt,.pptx"
             />
 
             <Button
@@ -335,7 +297,6 @@ export default function MessageInput({
               size="icon"
               variant="ghost"
               onClick={() => fileInputRef.current?.click()}
-              disabled={daysRemaining === 0}
             >
               <Paperclip className="h-4 w-4" />
             </Button>
@@ -343,7 +304,7 @@ export default function MessageInput({
             <Button
               type="submit"
               size="icon"
-              disabled={!message.trim() || sending || daysRemaining === 0}
+              disabled={!message.trim() || sending}
               className="bg-[#00D37F] hover:bg-[#00c070]"
             >
               {sending ? (
@@ -375,7 +336,7 @@ export default function MessageInput({
     )
   }
 
-  // Show special message for freelancer when commercial form is accepted
+  // FREELANCER WITH ACCEPTED COMMERCIAL FORM: Show project submission option
   if (isCurrentUserFreelancer && acceptedCommercialForm && !projectSubmitted) {
     return (
       <>
@@ -433,7 +394,7 @@ export default function MessageInput({
               type="file"
               className="hidden"
               onChange={handleFileSelect}
-              accept="image/*,.pdf,.doc,.docx,.txt"
+              accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar,.mp4,.mp3,.xls,.xlsx,.ppt,.pptx"
             />
 
             <Button
@@ -479,10 +440,19 @@ export default function MessageInput({
     )
   }
 
-  // Regular message input
+  // REGULAR MESSAGE INPUT: Once proposal is accepted, allow normal messaging
   return (
     <>
       <form onSubmit={handleSubmit} className="p-4 border-t">
+        {/* Show commercial form pending notice for clients */}
+        {!isCurrentUserFreelancer && pendingCommercialForm && (
+          <div className="mb-3 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-sm text-orange-800">
+              📄 Please review the commercial form above
+            </p>
+          </div>
+        )}
+
         {selectedFile && (
           <div className="mb-2 p-2 bg-gray-100 rounded-lg flex items-center justify-between">
             <span className="text-sm text-gray-600 truncate">{selectedFile.name}</span>
@@ -503,8 +473,8 @@ export default function MessageInput({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={canSendMessage() ? "Type a message..." : "Complete the form process to send messages"}
-              disabled={sending || !canSendMessage()}
+              placeholder="Type a message..."
+              disabled={sending}
               className="resize-none pr-10 min-h-[44px] max-h-32"
               rows={1}
             />
@@ -515,7 +485,7 @@ export default function MessageInput({
             type="file"
             className="hidden"
             onChange={handleFileSelect}
-            accept="image/*,.pdf,.doc,.docx,.txt"
+            accept="image/*,.pdf,.doc,.docx,.txt,.zip,.rar,.mp4,.mp3,.xls,.xlsx,.ppt,.pptx"
           />
 
           <Button
@@ -523,7 +493,6 @@ export default function MessageInput({
             size="icon"
             variant="ghost"
             onClick={() => fileInputRef.current?.click()}
-            disabled={!canSendMessage()}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -547,7 +516,7 @@ export default function MessageInput({
           <Button
             type="submit"
             size="icon"
-            disabled={!message.trim() || sending || !canSendMessage()}
+            disabled={!message.trim() || sending}
             className="bg-[#00D37F] hover:bg-[#00c070]"
           >
             {sending ? (

@@ -17,11 +17,9 @@ export interface PublicUser {
 }
 
 // Form/Proposal type
-// Update Form interface
-// Update your Form type in types.ts
 export interface Form {
   id: string
-  conversation_id: string // Make sure this is not optional
+  conversation_id: string
   title: string
   description: string
   price: number
@@ -78,7 +76,7 @@ export interface Conversation {
   unread_count?: number; // Support both formats
 }
 
-// Message type
+// Message type with attachment fields
 export interface Message {
   id: string;
   conversation_id: string;
@@ -87,12 +85,14 @@ export interface Message {
   content: string;
   attachment_url?: string;
   attachment_type?: 'image' | 'file';
+  attachment_filename?: string;  // New field
+  attachment_size?: number;      // New field
   is_read: boolean;
   created_at: Date | string;
   updated_at?: Date | string;
   form_id?: string;
   message_type: 'text' | 'form' | 'form_response';
-  form?: Form; // Now properly typed
+  form?: Form;
   sender?: PublicUser | any;
   receiver?: PublicUser;
 }

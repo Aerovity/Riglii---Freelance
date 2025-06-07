@@ -12,7 +12,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog"
-import { CheckCircle, XCircle, Clock, DollarSign, FileText, Receipt, Package } from "lucide-react"
+import { CheckCircle, XCircle, Clock, FileText, Receipt, Package } from "lucide-react"
 import type { Form } from "../../types"
 import ProjectDeliveryDisplay from "./ProjectDeliveryDisplay"
 import { sendProposalAcceptedEmail, sendCommercialAcceptedEmail } from "@/app/actions/emails"
@@ -75,6 +75,30 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
   const isCommercialForm = realFormType === 'commercial'
   const FormIcon = isCommercialForm ? Receipt : FileText
   const formTypeLabel = isCommercialForm ? 'Commercial Form' : 'Project Proposal'
+
+  const formatPrice = (price: number) => {
+    return `${price.toLocaleString()} DZD`
+  }
+
+  const formatTime = (timeEstimate: string) => {
+    // Handle common time formats and make them more readable
+    const time = timeEstimate.toLowerCase()
+    
+    // If it already contains "day", "week", "month", etc., return as is
+    if (time.includes('day') || time.includes('week') || time.includes('month') || time.includes('hour')) {
+      return timeEstimate
+    }
+    
+    // If it's just a number, assume days
+    const numMatch = time.match(/^\d+$/)
+    if (numMatch) {
+      const num = parseInt(numMatch[0])
+      return `${num} ${num === 1 ? 'day' : 'days'}`
+    }
+    
+    // Return as is for any other format
+    return timeEstimate
+  }
 
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return
@@ -448,16 +472,17 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
               <p className="text-sm text-muted-foreground">
                 {isCommercialForm ? 'Total Price' : 'Budget'}
               </p>
-              <p className="font-semibold flex items-center gap-1">
-                <DollarSign className="h-4 w-4" />
-                {form.price.toLocaleString()}
+              <p className="font-semibold text-lg">
+                {formatPrice(form.price)}
               </p>
             </div>
             <div className="space-y-1">
               <p className="text-sm text-muted-foreground">
                 {isCommercialForm ? 'Delivery Time' : 'Timeline'}
               </p>
-              <p className="font-semibold">{form.time_estimate}</p>
+              <p className="font-semibold">
+                {formatTime(form.time_estimate)}
+              </p>
             </div>
           </div>
 

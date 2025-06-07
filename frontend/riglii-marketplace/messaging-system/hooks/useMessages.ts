@@ -124,23 +124,33 @@ export const useMessages = (conversationId: string | null, userId: string) => {
     content: string,
     receiverId: string,
     attachmentUrl?: string | null,
-    attachmentType?: string | null
+    attachmentType?: string | null,
+    attachmentFilename?: string | null,
+    attachmentSize?: number | null
   ) => {
-    if (!conversationId) return
+    if (!conversationId) return { success: false }
 
     setSending(true)
     
+    // Build the message content
+    let messageContent = content
+    if (!content && attachmentUrl) {
+      messageContent = attachmentType === 'image' ? '📷 Image' : '📎 File attached'
+    }
+
     // Optimistically add the message
     const tempId = `temp-${Date.now()}`
     const optimisticMessage: Message = {
       id: tempId,
-      content: content || (attachmentUrl ? `Sent ${attachmentType === 'image' ? 'an image' : 'a file'}` : ''),
+      content: messageContent,
       sender_id: userId,
       receiver_id: receiverId,
       conversation_id: conversationId,
       created_at: new Date().toISOString(),
-      attachment_url: attachmentUrl,
-      attachment_type: attachmentType,
+      attachment_url: attachmentUrl ?? undefined,
+      attachment_type: (attachmentType === "image" || attachmentType === "file") ? attachmentType : undefined,
+      attachment_filename: attachmentFilename ?? undefined,
+      attachment_size: attachmentSize ?? undefined,
       message_type: 'text',
       is_read: false,
       sender: {
@@ -152,36 +162,58 @@ export const useMessages = (conversationId: string | null, userId: string) => {
     setMessages(prev => [...prev, optimisticMessage])
 
     try {
+      // Insert the message with all attachment metadata
+      const messageData: any = {
+        content: messageContent,
+        sender_id: userId,
+        receiver_id: receiverId,
+        conversation_id: conversationId,
+        message_type: 'text'
+      }
+
+      // Only add attachment fields if there's an attachment
+      if (attachmentUrl) {
+        messageData.attachment_url = attachmentUrl
+        messageData.attachment_type = attachmentType
+        messageData.attachment_filename = attachmentFilename
+        messageData.attachment_size = attachmentSize
+      }
+
+      console.log('Sending message with data:', messageData)
+
       const { data, error } = await supabase
         .from('messages')
-        .insert({
-          content: optimisticMessage.content,
-          sender_id: userId,
-          receiver_id: receiverId,
-          conversation_id: conversationId,
-          attachment_url: attachmentUrl,
-          attachment_type: attachmentType,
-          message_type: 'text'
-        })
+        .insert(messageData)
         .select()
         .single()
 
-      if (error) throw error
+      if (error) {
+        console.error('Error inserting message:', error)
+        throw error
+      }
+
+      console.log('Message sent successfully:', data)
 
       // Replace optimistic message with real one
       setMessages(prev => prev.map(msg => 
         msg.id === tempId ? { ...data, sender: optimisticMessage.sender } : msg
       ))
+
+      // Update conversation's updated_at
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', conversationId)
       
       return { success: true }
-    } catch (error) {
+    } catch (error: any) {
       // Remove optimistic message on error
       setMessages(prev => prev.filter(msg => msg.id !== tempId))
       
       console.error('Error sending message:', error)
       toast({
         title: "Error",
-        description: "Failed to send message",
+        description: error.message || "Failed to send message",
         variant: "destructive",
       })
       return { success: false, error }

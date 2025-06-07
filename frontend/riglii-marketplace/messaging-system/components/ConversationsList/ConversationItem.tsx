@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Clock, CheckCircle, XCircle } from "lucide-react"
 import type { Conversation } from "../../types"
 import { getUserInitials, getTimeAgo } from "../../utils/formatters"
+import { useAvatar } from "../../hooks/useAvatar"
 
 // Ensure Conversation type includes participant property
 import type { PublicUser } from "../../types"
@@ -28,6 +29,9 @@ export default function ConversationItem({
   messages = []
 }: ConversationItemProps) {
   const router = useRouter()
+  
+  // Use the improved avatar hook to fetch participant's avatar
+  const { avatarUrl, loading: avatarLoading, error: avatarError } = useAvatar(conversation.participant.id)
 
   // Get form status from messages
   const getFormStatus = () => {
@@ -96,10 +100,11 @@ export default function ConversationItem({
           onClick={handleAvatarClick}
         >
           <Avatar className="h-10 w-10">
-            {conversation.participant.avatar_url && (
-              <AvatarImage src={conversation.participant.avatar_url} />
-            )}
-            <AvatarFallback className="bg-gray-200 text-gray-600 text-sm">
+            <AvatarImage 
+              src={avatarUrl || undefined} 
+              alt={`${conversation.participant.full_name}'s avatar`}
+            />
+            <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {getUserInitials(conversation.participant.full_name)}
             </AvatarFallback>
           </Avatar>

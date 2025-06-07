@@ -2,7 +2,8 @@ import type { Conversation, Message } from "../../types"
 import MessageHeader from "./MessageHeader"
 import MessagesList from "./MessagesList"
 import MessageInput from "./MessageInput"
-import { uploadAttachment } from "../../utils/storage"
+import { createClient } from "@/utils/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 
 interface MessagesAreaProps {
   activeConversation: Conversation | null
@@ -14,7 +15,7 @@ interface MessagesAreaProps {
   onBack: () => void
   onFormSent: () => void
   onNewMessage: () => void
-  onSendMessage: (content: string, receiverId: string, attachmentUrl?: string | null, attachmentType?: string | null) => Promise<{ success: boolean }>
+  onSendMessage: (content: string, receiverId: string, attachmentUrl?: string | null, attachmentType?: string | null, attachmentFilename?: string | null, attachmentSize?: number | null) => Promise<{ success: boolean }>
 }
 
 export default function MessagesArea({
@@ -29,26 +30,66 @@ export default function MessagesArea({
   onNewMessage,
   onSendMessage
 }: MessagesAreaProps) {
+  const supabase = createClient()
+  const { toast } = useToast()
+
   const handleSendMessage = async (content: string, file?: File) => {
     if (!activeConversation) return
     
     let attachmentUrl = null
     let attachmentType = null
+    let attachmentFilename = null
+    let attachmentSize = null
 
     if (file) {
-      const result = await uploadAttachment(file, currentUserId)
-      if (result.error) {
+      try {
+        // Generate a unique file name
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+        const filePath = `${currentUserId}/${activeConversation.id}/${fileName}`
+
+        console.log('Uploading file:', { fileName, filePath, fileSize: file.size })
+
+        // Upload to storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from('message-attachments')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          })
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw uploadError
+        }
+
+        console.log('Upload successful:', uploadData)
+
+        // Set attachment metadata
+        attachmentUrl = uploadData.path
+        attachmentType = file.type.startsWith('image/') ? 'image' : 'file'
+        attachmentFilename = file.name
+        attachmentSize = file.size
+
+      } catch (error) {
+        console.error('Error uploading file:', error)
+        toast({
+          title: "Upload Failed",
+          description: "Unable to upload file. Please try again.",
+          variant: "destructive",
+        })
         return
       }
-      attachmentUrl = result.url
-      attachmentType = result.type
     }
 
+    // Send message with attachment metadata
     await onSendMessage(
       content,
       activeConversation.participant.id,
       attachmentUrl,
-      attachmentType
+      attachmentType,
+      attachmentFilename,
+      attachmentSize
     )
   }
 
