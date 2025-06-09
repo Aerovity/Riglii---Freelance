@@ -139,7 +139,8 @@ export default function HowToOrder() {
                 variant="outline"
                 size="lg"
                 className="border-2 border-gray-300 hover:border-gray-400 px-8 py-3 rounded-xl"
-              >
+                onClick={() => window.open("https://www.linkedin.com/posts/abdelaziz-brahmi_algeria-webdev-softwareengineering-ugcPost-7336876235987259392--lyh?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAFlHT90BBf4c9km5M003aEuvyP4Rw_kp6JU", "_blank")}
+              > 
                 Watch Demo
               </Button>
             </div>
@@ -256,6 +257,7 @@ export default function HowToOrder() {
               >
                 Contact Support
               </Button>
+              
             </div>
           </motion.div>
         </div>
@@ -269,18 +271,13 @@ export default function HowToOrder() {
             Our support team is available 24/7 to help you with any questions or issues
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/support">
+            <Link href="/contact-support">
               <Button variant="outline" className="rounded-xl">
                 Contact Support
                 <Headphones className="ml-2 w-4 h-4" />
               </Button>
             </Link>
-            <Link href="/help">
-              <Button variant="outline" className="rounded-xl">
-                Help Center
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
+            
           </div>
         </div>
       </section>

@@ -2,7 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ChevronDown, ArrowRight, Star, Heart, Briefcase, Code, Palette, Camera } from "lucide-react"
+import { ChevronDown, ArrowRight, Briefcase, Code, Palette, Camera } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useLanguage } from "./language-provider"
 import { useEffect, useRef, useState } from "react"
@@ -373,13 +373,7 @@ export default function Home() {
                   style={{ transitionDelay: `${400 + index * 100}ms` }}
                 >
                   <div className="absolute top-3 right-3 z-10">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="bg-white/80 backdrop-blur-sm rounded-full h-8 w-8 text-gray-700 hover:text-[#00D37F] hover:bg-white transition-all duration-300"
-                    >
-                      <Heart className="h-4 w-4" />
-                    </Button>
+                    
                   </div>
 
                   <div className="relative h-48 w-full overflow-hidden">

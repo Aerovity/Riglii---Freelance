@@ -108,10 +108,17 @@ export default function HowToBecomeFreelancer() {
                   <ArrowRight className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
+
               <Button
                 variant="outline"
                 size="lg"
                 className="border-2 border-gray-300 hover:border-gray-400 px-8 py-3 rounded-xl"
+                onClick={() =>
+                  window.open(
+                    "https://www.linkedin.com/posts/abdelaziz-brahmi_algeria-webdev-softwareengineering-ugcPost-7336876235987259392--lyh?utm_source=social_share_send&utm_medium=member_desktop_web&rcm=ACoAAFlHT90BBf4c9km5M003aEuvyP4Rw_kp6JU",
+                    "_blank",
+                  )
+                }
               >
                 Watch Tutorial
               </Button>
@@ -186,7 +193,7 @@ export default function HowToBecomeFreelancer() {
               <Button
                 variant="outline"
                 size="lg"
-                className="border-2 border-white text-white hover:bg-white hover:text-[#00D37F] px-8 py-3 rounded-xl"
+                className="border-2 border-white bg-white text-[#00D37F] px-8 py-3 rounded-xl"
               >
                 Learn More
               </Button>

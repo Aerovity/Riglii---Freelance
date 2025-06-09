@@ -7,9 +7,8 @@ import Link from "next/link"
 import { useState, useEffect } from "react"
 import { createClient } from "@/utils/supabase/client"
 import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Star, Heart } from "lucide-react"
+import { Star } from "lucide-react"
 
 interface FreelancerCardProps {
   id: string
@@ -172,19 +171,7 @@ export default function FreelancerCard({ freelancer }: { freelancer: FreelancerC
     <Link href={`/freelancer/${freelancer.user_id}`} onClick={handleCardClick}>
       <Card className="group relative rounded-xl overflow-hidden border border-gray-200 bg-white hover:shadow-lg transition-all duration-300 cursor-pointer">
         <div className="absolute top-3 right-3 z-10">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="bg-white/80 backdrop-blur-sm rounded-full h-8 w-8 text-gray-700 hover:text-[#00D37F] opacity-0 group-hover:opacity-100 transition-opacity"
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-              // Handle favorite functionality
-              console.log("Added to favorites:", freelancer.id)
-            }}
-          >
-            <Heart className="h-4 w-4" />
-          </Button>
+          
         </div>
 
         <div className="relative h-48 w-full overflow-hidden">
