@@ -250,10 +250,10 @@ export default function HowToOrder() {
                   <Search className="ml-2 w-5 h-5" />
                 </Button>
               </Link>
-              <Button
+               <Button
                 variant="outline"
                 size="lg"
-                className="border-2 border-white text-white hover:bg-white hover:text-green-600 px-8 py-3 rounded-xl"
+                className="border-2 border-white bg-white text-[#00D37F] px-8 py-3 rounded-xl"
               >
                 Contact Support
               </Button>
