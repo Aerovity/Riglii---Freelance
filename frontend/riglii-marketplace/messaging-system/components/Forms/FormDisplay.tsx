@@ -16,6 +16,7 @@ import { CheckCircle, XCircle, Clock, FileText, Receipt, Package } from "lucide-
 import type { Form } from "../../types"
 import ProjectDeliveryDisplay from "./ProjectDeliveryDisplay"
 import { sendProposalAcceptedEmail, sendCommercialAcceptedEmail } from "@/app/actions/emails"
+import Link from "next/link"
 
 interface FormDisplayProps {
   form: Form
@@ -561,6 +562,11 @@ export default function FormDisplay({ form, currentUserId, onStatusUpdate }: For
             <DialogTitle>Digital Signature Required</DialogTitle>
             <DialogDescription>
               Please sign below to accept this {isCommercialForm ? 'commercial form' : 'project proposal'}.
+              {isCommercialForm && (
+                <span className="block mt-2">
+                  By signing, you agree to the <Link href="/terms/user" className="text-blue-600 hover:underline">terms and conditions</Link>.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           

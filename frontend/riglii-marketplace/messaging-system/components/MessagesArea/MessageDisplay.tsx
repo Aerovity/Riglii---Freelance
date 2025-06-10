@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { getUserInitials, getTimeAgo } from "../../utils/formatters"
-import { Package, Download, Link, FileText, Loader2, CheckCircle, Clock } from "lucide-react"
+import { Package, Download, Link, FileText, Loader2, CheckCircle, Clock, AlertCircle } from "lucide-react"
 import { downloadProjectFile, fetchProjectFilesFromStorage } from "../../utils/storage"
 import FormDisplay from "../Forms/FormDisplay"
 import MessageAttachment from "./MessageAttachment"
@@ -32,6 +32,7 @@ interface ProjectForm {
   project_submitted_at?: string
   form_type?: string
   status?: string
+  price?: number
 }
 
 interface MessageDisplayProps {
@@ -99,12 +100,29 @@ export default function MessageDisplay({
     return (bytes / (1024 * 1024)).toFixed(1) + " MB"
   }
 
+  const formatPrice = (price: number) => {
+    return `${price.toLocaleString()} DZD`
+  }
+
   // Check if this is a system/status message
   const isSystemMessage = message.content.includes("✅ Proposal accepted") || 
                          message.content.includes("Accepted the project form")
 
+  // Check if this is a commercial form accepted message
+  const isCommercialFormAccepted = message.content.includes("✅ Commercial form accepted")
+
   // Check if this is a project delivery message
   const isProjectDelivery = message.content.includes("📦 Project delivered!")
+
+  // Find the commercial form if this is a commercial form accepted message
+  const commercialForm = isCommercialFormAccepted
+    ? allMessages.find(
+        (m) => m.message_type === "form" && 
+               m.form?.form_type === "commercial" && 
+               m.form?.status === "accepted" &&
+               m.created_at < message.created_at // The form should be created before the acceptance message
+      )?.form
+    : null
 
   // If it's a project delivery message, find the associated commercial form
   const projectForm = isProjectDelivery
@@ -190,7 +208,47 @@ export default function MessageDisplay({
     )
   }
 
-  // If it's a system message (proposal accepted, commercial form accepted)
+  // If it's a commercial form accepted message, show with payment info
+  if (isCommercialFormAccepted) {
+    // Find the commercial form from previous messages
+    const commercialFormMessage = allMessages.find(
+      (m) => m.message_type === "form" && 
+             m.form?.form_type === "commercial" && 
+             m.form?.status === "accepted" &&
+             m.created_at < message.created_at
+    )
+    const commercialForm = commercialFormMessage?.form
+    const depositAmount = commercialForm?.price ? commercialForm.price * 0.25 : 0
+    
+    // Check if the current user is the client (receiver of the commercial form)
+    const isClient = commercialForm && currentUserId === commercialForm.receiver_id
+    
+    return (
+      <div className="flex justify-center mb-4">
+        <div className="max-w-md w-full">
+          <Card className="bg-green-50 border-green-200">
+            <CardContent className="p-3">
+              <div className="flex items-center gap-2 justify-center">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-900">
+                  {message.content}
+                  {isClient && commercialForm?.price && (
+                    <span className="block mt-1 text-amber-700">
+                      You'll have to pay 25% of the total price ({formatPrice(depositAmount)})
+                    </span>
+                  )}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <p className="text-xs text-gray-500 mt-1 text-center">{getTimeAgo(new Date(message.created_at))}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // If it's a system message (proposal accepted, other system messages)
   if (isSystemMessage) {
     return (
       <div className="flex justify-center mb-4">
