@@ -250,19 +250,6 @@ export default function CategoryPage() {
 
   return (
     <div>
-      {/* Breadcrumb */}
-      <div className="border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center text-sm">
-            <Link href="/" className="text-gray-500 hover:text-[#00D37F]">
-              Home
-            </Link>
-            <ChevronRight className="h-4 w-4 mx-2 text-gray-400" />
-            <span className="text-[#0F2830] font-medium capitalize">{category}</span>
-          </div>
-        </div>
-      </div>
-
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
