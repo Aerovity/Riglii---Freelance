@@ -4,7 +4,7 @@ import type React from "react"
 
 import Link from "next/link"
 import Image from "next/image"
-import { Search, UserIcon, Settings, LogOut, Menu, X } from 'lucide-react'
+import { Search, UserIcon, Settings, LogOut, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useEffect, useState } from "react"
@@ -191,10 +191,29 @@ export default function SiteHeader() {
       {/* Scroll Progress Bar */}
       <ScrollProgress />
 
+      {/* Beta Banner */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 z-[60] bg-gradient-to-r from-[#00D37F] to-[#00B86A] text-white py-1 px-4"
+        initial={{ y: -50, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+      >
+        <div className="container mx-auto">
+          <div className="flex items-center justify-center text-center">
+            <p className="text-sm font-medium">
+              Welcome to the beta version of Riglii, Thanks for your understanding for any problem{" "}
+              <Link href="/contact" className="underline hover:no-underline font-semibold transition-all duration-200">
+                contact support
+              </Link>
+            </p>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Fixed Header Container */}
       <motion.div
         className={cn(
-          "fixed top-0 left-0 right-0 z-50 transition-all duration-300",
+          "fixed top-8 left-0 right-0 z-50 transition-all duration-300",
           isScrolled ? "bg-white/95 backdrop-blur-xl shadow-xl border-b border-gray-200/50" : "bg-white",
         )}
         initial={{ y: -100 }}

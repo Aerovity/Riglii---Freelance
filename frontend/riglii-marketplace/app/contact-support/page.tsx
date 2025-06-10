@@ -59,7 +59,7 @@ export default function ContactSupportPage() {
                   </div>
                   <div>
                     <h3 className="text-xl font-semibold mb-2 text-gray-900">Email</h3>
-                    <p className="text-gray-600">support@eldoraui.com</p>
+                    <p className="text-gray-600">benazzaanis783@gmail.com</p>
                   </div>
                 </div>
               </CardContent>
