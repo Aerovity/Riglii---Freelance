@@ -63,7 +63,7 @@ export default function CategoryPage() {
       // Apply sorting
       switch (sort) {
         case "price_low_high":
-          query = query.order("price", { ascending: true, nullsLast: true })
+          query = query.order("price", { ascending: true })
           break
         case "price_high_low":
           query = query.order("price", { ascending: false, nullsFirst: true })
@@ -330,7 +330,6 @@ export default function CategoryPage() {
                   key={freelancer.id}
                   freelancer={{
                     ...freelancer,
-                    email: freelancer.users?.email,
                   }}
                 />
               ))}
