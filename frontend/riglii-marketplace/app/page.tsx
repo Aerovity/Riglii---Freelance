@@ -8,6 +8,7 @@ import { useLanguage } from "./language-provider"
 import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import FreelancerCard from "@/components/freelancer-card"
+import { useRouter, useSearchParams } from 'next/navigation'
 
 interface FreelancerData {
   id: string
@@ -26,12 +27,25 @@ interface FreelancerData {
 
 export default function Home() {
   const { t } = useLanguage()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [visibleSections, setVisibleSections] = useState<Set<string>>(new Set())
   const [randomFreelancers, setRandomFreelancers] = useState<FreelancerData[]>([])
   const [loadingFreelancers, setLoadingFreelancers] = useState(true)
   const observerRef = useRef<IntersectionObserver | null>(null)
 
   const supabase = createClient()
+
+  // OAuth redirect handler - CRITICAL ADDITION
+  useEffect(() => {
+    // Check if we have an OAuth code in the URL
+    const code = searchParams.get('code')
+    if (code) {
+      // Preserve all search params when redirecting
+      const params = new URLSearchParams(searchParams)
+      router.push(`/auth/callback?${params.toString()}`)
+    }
+  }, [searchParams, router])
 
   // Function to format price in DZD
   const formatPrice = (amount: number) => {

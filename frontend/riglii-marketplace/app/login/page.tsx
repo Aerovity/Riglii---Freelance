@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import Link from 'next/link'
 import Image from 'next/image'
-import { login, signup } from './action'
+import { login, signup, signInWithProvider } from './action'
 
 // Type for action results
 type ActionResult = {
@@ -94,11 +94,24 @@ export default function SignInPage() {
         }
     }
 
-    const handleSocialLogin = (provider: string) => {
-        // Just log for now - you can implement social login later
-        console.log(`${provider} login initiated`)
+    const handleSocialLogin = async (provider: 'google' | 'facebook') => {
+        setError('')
+        setIsLoading(true)
+        
+        try {
+            const result = await signInWithProvider(provider)
+            
+            if (result?.error) {
+                setError(result.error)
+                setIsLoading(false)
+            }
+            // If successful, the action will handle the redirect
+        } catch (err) {
+            console.error(`${provider} login error:`, err)
+            setError(`Failed to sign in with ${provider}`)
+            setIsLoading(false)
+        }
     }
-
     return (
         <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white flex items-center justify-center px-4 py-12">
             <div className="w-full max-w-md">

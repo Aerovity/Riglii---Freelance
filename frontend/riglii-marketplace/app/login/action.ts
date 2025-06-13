@@ -79,3 +79,42 @@ export async function signup(formData: FormData) {
   // Successful signup - redirect to verify email page
   redirect(`/auth/verify-email?email=${encodeURIComponent(data.email)}`)
 }
+
+export async function signInWithProvider(provider: 'google' | 'facebook', isSignup: boolean = false) {
+  const supabase = await createClient()
+  
+  // Build the OAuth options with proper query parameters
+  const options: any = {
+    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback${isSignup ? '?signup=true' : ''}`
+  }
+  
+  // Add provider-specific parameters
+  if (provider === 'google') {
+    options.queryParams = {
+      access_type: 'offline',
+      prompt: 'select_account' // Force account selection
+    }
+    // Alternative approach - add it to scopes
+    options.scopes = 'email profile'
+    // Skip the single sign-on behavior
+    options.skipBrowserRedirect = false
+  }
+  
+  console.log('OAuth options:', options)
+  
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options
+  })
+
+  if (error) {
+    console.error(`${provider} sign in error:`, error)
+    return { error: `Failed to sign in with ${provider}` }
+  }
+
+  if (data?.url) {
+    // Log the URL to verify parameters are included
+    console.log('OAuth URL:', data.url)
+    redirect(data.url)
+  }
+}
