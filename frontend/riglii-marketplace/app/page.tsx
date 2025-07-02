@@ -9,6 +9,14 @@ import { useEffect, useRef, useState } from "react"
 import { createClient } from "@/utils/supabase/client"
 import FreelancerCard from "@/components/freelancer-card"
 import { useRouter, useSearchParams } from 'next/navigation'
+import Script from "next/script"
+
+// Extend Window interface for Chatbase
+declare global {
+  interface Window {
+    chatbase: any;
+  }
+}
 
 interface FreelancerData {
   id: string
@@ -35,6 +43,76 @@ export default function Home() {
   const observerRef = useRef<IntersectionObserver | null>(null)
 
   const supabase = createClient()
+
+  // Chatbase initialization with identity verification
+  useEffect(() => {
+    // Initialize Chatbase
+    if (typeof window !== 'undefined') {
+      if (!window.chatbase || window.chatbase("getState") !== "initialized") {
+        window.chatbase = function(...args: any[]) {
+          if (!window.chatbase.q) {
+            window.chatbase.q = [];
+          }
+          window.chatbase.q.push(args);
+        };
+        
+        window.chatbase = new Proxy(window.chatbase, {
+          get(target, prop) {
+            if (prop === "q") {
+              return target.q;
+            }
+            return (...args: any[]) => target(prop, ...args);
+          }
+        });
+      }
+
+      const onLoad = async function() {
+        const script = document.createElement("script");
+        script.src = "https://www.chatbase.co/embed.min.js";
+        script.id = "llTfRAuiXGvU30bb-Aes_";
+        script.setAttribute("data-domain", "www.chatbase.co");
+        document.body.appendChild(script);
+
+        // Check if user is authenticated and identify them
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Get identity verification hash from your API
+            const response = await fetch('/api/chatbase-auth', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (response.ok) {
+              const { userId, userHash, userEmail } = await response.json();
+              
+              // Wait for chatbase to load, then identify the user
+              setTimeout(() => {
+                if (window.chatbase) {
+                  window.chatbase('identify', {
+                    userId: userId,
+                    userHash: userHash,
+                    userEmail: userEmail
+                  });
+                }
+              }, 1000);
+            }
+          }
+        } catch (error) {
+          console.log('Chatbase identity verification failed:', error);
+          // Chatbase will still work without identity verification
+        }
+      };
+
+      if (document.readyState === "complete") {
+        onLoad();
+      } else {
+        window.addEventListener("load", onLoad);
+      }
+    }
+  }, [])
 
   // OAuth redirect handler - CRITICAL ADDITION
   useEffect(() => {
